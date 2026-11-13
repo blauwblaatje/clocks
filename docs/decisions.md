@@ -542,3 +542,11 @@ Choices made while building, not yet confirmed with Rogier:
 Simulator: the slot is ~/.cache/crg-sim-update.bin, restart exits;
 CLOCK_SIM_VERSION, CLOCK_SIM_BATTERY, CLOCK_SIM_USB stand in for the
 board. tools/game-test/update.py: 27 checks.
+
+## 2026-11-13: update choices confirmed, repository
+Rogier agreed to the four update choices above (30 % battery limit; USB =
+a computer; release address as a setting; menu installs only newer,
+setup page installs any firmware.bin). Repository
+github.com/blauwblaatje/clocks (public, GPL-3.0 as the CRG scoreboard),
+case/out models included, crg-jam-timer.zip left out. v0.1.0 tagged:
+ghcr.io/blauwblaatje/clocks:0.1.0.

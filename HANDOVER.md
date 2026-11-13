@@ -69,8 +69,11 @@ Compiles for the chip, not run (`cd firmware && pio run -e c6`)
 Install and update site
 - `Dockerfile` + `web-installer/`: builds the firmware and serves an ESP
   Web Tools install page, `firmware.bin`, `manifest.json`, `latest.json`
-  on nginx. Built and checked locally. To run at clock.quagga.rocks on
-  dc-k3s; GitHub repository and dc-k3s manifests wait for Rogier.
+  on nginx. Repository github.com/blauwblaatje/clocks (2026-11-13, GPL-3.0);
+  a tag vX.Y.Z publishes ghcr.io/blauwblaatje/clocks. v0.1.0 tagged
+  2026-11-13. Live at https://clock.quagga.rocks since 2026-11-13 (dc-k3s,
+  Let's Encrypt; the live latest.json and firmware.bin pass lib/update's
+  checks). Ask before pushes and tags.
 
 Case
 - v1 (`case/`): switch holders, motor pad, cable anchor, board pads. Not
@@ -380,9 +383,9 @@ Power
 Before the board arrives (no hardware needed)
 1. Done 2026-11-13: device side of "Update" (see section 2). On the
    board still to try: HTTPS against clock.quagga.rocks, the rollback.
-2. GitHub repository for `clock/` and the dc-k3s manifests for
-   clock.quagga.rocks: only when Rogier says so (ask before anything on
-   GitHub).
+2. Repository done 2026-11-13 (blauwblaatje/clocks, v0.1.0). dc-k3s
+   manifests for clock.quagga.rocks: handed to the instance working on
+   dc-k3s (../clock-dc-k3s-handoff.md).
 3. Done 2026-11-13, not overnight (Rogier): tools/game-test, game4.py
    (a game with JT, two PBTs and a PBM) and drops.py (cut, unreachable,
    silent drop, flapping, run locally, CRG restart).
