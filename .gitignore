@@ -1,0 +1,7 @@
+.pio/
+.vscode/
+*.bin
+sim/deps/
+sim/build/
+__pycache__/
+crg-jam-timer.zip

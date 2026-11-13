@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CLOCK firmware</title>
+<script type="module" src="https://unpkg.com/esp-web-tools@10.0.1/dist/web/install-button.js?module"></script>
+<style>
+body{font-family:system-ui,sans-serif;margin:0 auto;max-width:560px;padding:12px 16px;background:#111;color:#eee}
+h1{font-size:1.3em}h2{font-size:1.05em;margin-top:1.6em;border-bottom:1px solid #444}
+a{color:#6fb6ff}code{background:#222;padding:1px 4px;border-radius:3px}small{color:#aaa}
+esp-web-install-button button{padding:10px 18px;font-size:1em}
+</style></head><body>
+<h1>CLOCK firmware</h1><p><small>CRG-Linked Officials' Clock Kit</small></p>
+<p>Version <b id="version">…</b></p>
+<h2>Install over USB</h2>
+<p>Connect the timer with a USB-C cable and press the button. Needs Chrome or Edge on a computer
+(Web Serial). This is also how the very first install is done.</p>
+<esp-web-install-button manifest="manifest.json"></esp-web-install-button>
+<h2>Update without a cable</h2>
+<p>On the timer: menu, Connection, Update (looks here when the timer has internet), or download
+<a href="firmware.bin" download>firmware.bin</a> and upload it on the timer's setup page.</p>
+<p><small>For the timer: <code>latest.json</code> holds the version, size and SHA-256 of
+<code>firmware.bin</code>.</small></p>
+<script>
+fetch("latest.json").then(r => r.json()).then(j => { document.getElementById("version").textContent = j.version; });
+</script>
+</body></html>

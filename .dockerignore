@@ -1,0 +1,4 @@
+firmware/.pio
+sim/deps
+sim/build
+case/out/*.png
