@@ -15,6 +15,7 @@ Needs `libsdl2-dev`, a C/C++ compiler and make.
     build/sim --setup                    # open the setup page at once (also: menu > Connection > Setup)
     build/sim --shots DIR                # no window: every screen state as DIR/*.ppm
     build/sim --ctl [--crg ..] [--role ..]  # no window, scripted on stdin (tools/game-test)
+    build/sim --board stopwatch ...      # the M5Stack StopWatch: 466 x 466, its fonts, its updates
 
 Keys: Space or C = crown (12 o'clock), U or Left arrow = the 10 o'clock
 button, T or Right arrow = the 2 o'clock button. Hold a key as you would
@@ -52,7 +53,10 @@ before generating it. Regenerate a bitmap font from sim/, e.g.:
       --lv-include lvgl.h --font deps/montserrat/Montserrat-Bold.ttf --size 17 \
       -r 0x20-0x7E,0xB7,0x2026 -o ../firmware/lib/jtui/fonts/jt_b17.c
 
-Clock fonts (jt_sb*) use `--symbols 0123456789:.-` instead of `-r`.
+Clock fonts (jt_sb*) use `--symbols 0123456789:.-` instead of `-r`. The
+StopWatch's fonts (`firmware/lib/jtfonts466/jt466_*`, named by design size)
+are the same commands at size x 466/240, rounded; the table is in
+jtfonts466.h.
 
 The device glue (roles, menu, CRG connection) is `firmware/lib/device`,
 shared with the firmware; the simulator only adds SDL, keys and files.

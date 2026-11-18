@@ -55,6 +55,8 @@ class Platform {
     virtual void stopSetup() = 0;
     // Firmware updates (lib/update, HANDOVER section 8)
     virtual std::string firmwareVersion() = 0;
+    virtual const upd::Board& board() = 0;                                  // which firmware this is (updates)
+    virtual int displaySize() { return 240; }                               // round display, pixels across (scale.h)
     virtual upd::Slot& updateSlot() = 0;                                    // the inactive app slot
     virtual std::unique_ptr<upd::Fetch> fetch(const std::string& url) = 0; // nullptr = cannot start
     virtual bool usbPower() = 0;                                            // powered over USB (rules for a low battery)
@@ -167,6 +169,7 @@ class Device : public menu::Host {
         upd::Slot& slot() override { return d.p_.updateSlot(); }
         upd::Conditions conditions() override;
         std::string version() override { return d.p_.firmwareVersion(); }
+        const upd::Board& board() override { return d.p_.board(); }
     } updHost_{*this};
     upd::Flow update_{updHost_};
     lv_obj_t* updateRoot_ = nullptr;

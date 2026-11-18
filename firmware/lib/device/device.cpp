@@ -2,6 +2,9 @@
 
 #include "boxcore.h"
 #include "jamcore.h"
+#include "scale.h"
+
+using ui::px;
 
 namespace dev {
 
@@ -65,6 +68,8 @@ const char* roleArg(menu::RoleId r) {
 
 Device::Device(Platform& p, lv_obj_t* screen, const jt::Fonts& f)
     : p_(p), screen_(screen), fonts_(f), port_(8000), menu_(*this) {
+    // Screens are drawn for 240 x 240 and scaled to the display (scale.h).
+    ui::gScreen = p_.displaySize();
     settings_ = cfg::parse(p_.loadSettings());
     role_ = (menu::RoleId)settings_.role;
     p_.scoreboard(settings_, host_, port_);
@@ -79,11 +84,11 @@ Device::Device(Platform& p, lv_obj_t* screen, const jt::Fonts& f)
     lv_obj_set_style_text_font(battery_, fonts_.m12, 0);
     lv_obj_set_style_bg_color(battery_, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(battery_, LV_OPA_80, 0);
-    lv_obj_set_style_pad_hor(battery_, 6, 0);
-    lv_obj_set_style_radius(battery_, 6, 0);
+    lv_obj_set_style_pad_hor(battery_, px(6), 0);
+    lv_obj_set_style_radius(battery_, px(6), 0);
     lv_label_set_text(battery_, "");
     // inside the ring (radius 113), below the hint line
-    lv_obj_align_to(battery_, screen_, LV_ALIGN_BOTTOM_MID, 0, -((lv_obj_get_height(screen_) - 240) / 2) - 14);
+    lv_obj_align_to(battery_, screen_, LV_ALIGN_BOTTOM_MID, 0, -((lv_obj_get_height(screen_) - px(240)) / 2) - px(14));
     lv_obj_add_flag(battery_, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -128,9 +133,9 @@ void Device::sleepCheck(uint32_t now) {
             lv_obj_set_style_bg_color(sleepNotice_, lv_color_hex(0x202024), 0);
             lv_obj_set_style_bg_opa(sleepNotice_, LV_OPA_90, 0);
             lv_obj_set_style_border_color(sleepNotice_, lv_color_hex(0x6fb6ff), 0);
-            lv_obj_set_style_border_width(sleepNotice_, 1, 0);
-            lv_obj_set_style_radius(sleepNotice_, 10, 0);
-            lv_obj_set_style_pad_all(sleepNotice_, 10, 0);
+            lv_obj_set_style_border_width(sleepNotice_, px(1), 0);
+            lv_obj_set_style_radius(sleepNotice_, px(10), 0);
+            lv_obj_set_style_pad_all(sleepNotice_, px(10), 0);
         }
         lv_obj_remove_flag(sleepNotice_, LV_OBJ_FLAG_HIDDEN);
     }
@@ -233,7 +238,7 @@ menu::Refusal Device::startSetup() {
     // Setup screen: QR code and how to connect. Any button closes it.
     setupRoot_ = lv_obj_create(screen_);
     lv_obj_remove_style_all(setupRoot_);
-    lv_obj_set_size(setupRoot_, 240, 240);
+    lv_obj_set_size(setupRoot_, px(240), px(240));
     lv_obj_center(setupRoot_);
     lv_obj_set_style_radius(setupRoot_, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_clip_corner(setupRoot_, true, 0);
@@ -243,29 +248,29 @@ menu::Refusal Device::startSetup() {
     lv_obj_set_style_text_font(t, fonts_.b17, 0);
     lv_obj_set_style_text_color(t, lv_color_white(), 0);
     lv_label_set_text(t, "Setup");
-    lv_obj_align(t, LV_ALIGN_TOP_MID, 0, 18);
+    lv_obj_align(t, LV_ALIGN_TOP_MID, 0, px(18));
     lv_obj_t* qr = lv_qrcode_create(setupRoot_);
-    lv_qrcode_set_size(qr, 96);
+    lv_qrcode_set_size(qr, px(96));
     lv_qrcode_set_dark_color(qr, lv_color_black());
     lv_qrcode_set_light_color(qr, lv_color_white());
     lv_qrcode_update(qr, info.qr.data(), (uint32_t)info.qr.size());
     lv_obj_set_style_border_color(qr, lv_color_white(), 0);
-    lv_obj_set_style_border_width(qr, 4, 0);
-    lv_obj_align(qr, LV_ALIGN_TOP_MID, 0, 42);
+    lv_obj_set_style_border_width(qr, px(4), 0);
+    lv_obj_align(qr, LV_ALIGN_TOP_MID, 0, px(42));
     int y = 150;
     for (auto& l : info.lines) {
         lv_obj_t* lb = lv_label_create(setupRoot_);
         lv_obj_set_style_text_font(lb, fonts_.m12, 0);
         lv_obj_set_style_text_color(lb, lv_color_hex(0xd6d6d6), 0);
         lv_label_set_text(lb, l.c_str());
-        lv_obj_align(lb, LV_ALIGN_TOP_MID, 0, y);
+        lv_obj_align(lb, LV_ALIGN_TOP_MID, 0, px(y));
         y += 16;
     }
     lv_obj_t* hint = lv_label_create(setupRoot_);
     lv_obj_set_style_text_font(hint, fonts_.m12, 0);
     lv_obj_set_style_text_color(hint, lv_color_hex(0x8f8f8f), 0);
     lv_label_set_text(hint, "Any button: close");
-    lv_obj_align(hint, LV_ALIGN_TOP_MID, 0, y + 4);
+    lv_obj_align(hint, LV_ALIGN_TOP_MID, 0, px(y + 4));
     return "";
 }
 
@@ -348,7 +353,7 @@ void Device::onTouch(lv_event_t* e) {
     lv_indev_get_point(lv_indev_active(), &pt);
     lv_area_t a;
     lv_obj_get_coords(d->app_->root(), &a);
-    int x = pt.x - a.x1, y = pt.y - a.y1;
+    int x = ui::design(pt.x - a.x1), y = ui::design(pt.y - a.y1);
     uint32_t now = d->p_.now();
     d->activityAt_ = now;
     if (d->warnAt_) {
@@ -615,7 +620,7 @@ menu::Refusal Device::startUpdate() {
     if (settings_.updateUrl.empty()) return "No release address (setup page)";
     menu_.close();
     openUpdateScreen();
-    update_.check(settings_.updateUrl, p_.now());
+    update_.check(upd::releaseUrl(settings_.updateUrl, p_.board()), p_.now());
     showUpdate(p_.now());
     return "";
 }
@@ -625,10 +630,10 @@ static lv_obj_t* updLabel(lv_obj_t* parent, const lv_font_t* f, uint32_t color, 
     lv_obj_set_style_text_font(l, f, 0);
     lv_obj_set_style_text_color(l, lv_color_hex(color), 0);
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_width(l, 190);
+    lv_obj_set_width(l, px(190));
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
     lv_label_set_text(l, "");
-    lv_obj_align(l, LV_ALIGN_TOP_MID, 0, y);
+    lv_obj_align(l, LV_ALIGN_TOP_MID, 0, px(y));
     return l;
 }
 
@@ -637,11 +642,11 @@ static lv_obj_t* updBox(lv_obj_t* parent, int x, int y, int w, int h, uint32_t c
     lv_obj_remove_style_all(o);
     lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_remove_flag(o, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_pos(o, x, y);
-    lv_obj_set_size(o, w, h);
+    lv_obj_set_pos(o, px(x), px(y));
+    lv_obj_set_size(o, px(w), px(h));
     lv_obj_set_style_bg_color(o, lv_color_hex(color), 0);
     lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(o, h > 20 ? 10 : h / 2, 0);
+    lv_obj_set_style_radius(o, px(h > 20 ? 10 : h / 2), 0);
     return o;
 }
 
@@ -652,7 +657,7 @@ void Device::openUpdateScreen() {
     updateRoot_ = lv_obj_create(screen_);
     lv_obj_remove_style_all(updateRoot_);
     lv_obj_remove_flag(updateRoot_, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_size(updateRoot_, 240, 240);
+    lv_obj_set_size(updateRoot_, px(240), px(240));
     lv_obj_center(updateRoot_);
     lv_obj_set_style_radius(updateRoot_, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_clip_corner(updateRoot_, true, 0);
@@ -761,7 +766,7 @@ void Device::showUpdate(uint32_t) {
         else lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
     };
     vis(updBar_, bar);
-    lv_obj_set_width(updFill_, 160 * pm / 1000);
+    lv_obj_set_width(updFill_, px(160 * pm / 1000));
     vis(updYes_, buttons);
     vis(updNo_, buttons);
 }
@@ -773,7 +778,7 @@ void Device::onUpdateTouch(lv_event_t* e) {
     lv_area_t a;
     lv_obj_get_coords(d->updateRoot_, &a);
     d->activityAt_ = d->p_.now();
-    d->updateTouch(pt.x - a.x1, pt.y - a.y1, d->p_.now());
+    d->updateTouch(ui::design(pt.x - a.x1), ui::design(pt.y - a.y1), d->p_.now());
 }
 
 void Device::updateTouch(int x, int y, uint32_t now) {

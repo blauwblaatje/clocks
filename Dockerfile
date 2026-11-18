@@ -10,8 +10,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /
 WORKDIR /src
 COPY firmware firmware
 COPY web-installer web-installer
-RUN cd firmware && PLATFORMIO_BUILD_FLAGS="-DFW_VERSION=\\\"${VERSION}\\\"" pio run -e c6 \
- && mkdir -p /out && cp .pio/build/c6/firmware.bin .pio/build/c6/firmware.factory.bin /out/ \
+# One firmware per board (firmware/platformio.ini): env c6 = waveshare-c6,
+# env stopwatch = m5-stopwatch, each in its own folder on the site.
+RUN cd firmware && PLATFORMIO_BUILD_FLAGS="-DFW_VERSION=\\\"${VERSION}\\\"" pio run -e c6 -e stopwatch \
+ && mkdir -p /out/waveshare-c6 /out/m5-stopwatch \
+ && cp .pio/build/c6/firmware.bin .pio/build/c6/firmware.factory.bin /out/waveshare-c6/ \
+ && cp .pio/build/stopwatch/firmware.bin .pio/build/stopwatch/firmware.factory.bin /out/m5-stopwatch/ \
  && cp ../web-installer/index.html /out/ && python ../web-installer/make_release.py "$VERSION" /out
 
 FROM nginxinc/nginx-unprivileged:1.27.4-alpine

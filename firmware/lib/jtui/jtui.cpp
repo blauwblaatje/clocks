@@ -1,4 +1,9 @@
 #include "jtui.h"
+#include "scale.h"
+
+using ui::px;
+
+int ui::gScreen = ui::kDesign;
 
 namespace jt {
 
@@ -32,14 +37,14 @@ lv_obj_t* label(lv_obj_t* parent, const lv_font_t* f, uint32_t color, int y) {
     lv_obj_set_style_text_color(l, lv_color_hex(color), 0);
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(l, "");
-    lv_obj_align(l, LV_ALIGN_TOP_MID, 0, y);
+    lv_obj_align(l, LV_ALIGN_TOP_MID, 0, px(y));
     return l;
 }
 
 // A ring: arc of the given outer diameter and stroke, starting at 12 o'clock.
 lv_obj_t* ring(lv_obj_t* parent, int diameter, int width, uint32_t track) {
     lv_obj_t* a = lv_arc_create(parent);
-    lv_obj_set_size(a, diameter, diameter);
+    lv_obj_set_size(a, px(diameter), px(diameter));
     lv_obj_center(a);
     lv_obj_remove_flag(a, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_style(a, nullptr, LV_PART_KNOB);
@@ -47,8 +52,8 @@ lv_obj_t* ring(lv_obj_t* parent, int diameter, int width, uint32_t track) {
     lv_arc_set_bg_angles(a, 0, 360);
     lv_arc_set_range(a, 0, 1000);
     lv_arc_set_value(a, 0);
-    lv_obj_set_style_arc_width(a, width, LV_PART_MAIN);
-    lv_obj_set_style_arc_width(a, width, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_width(a, px(width), LV_PART_MAIN);
+    lv_obj_set_style_arc_width(a, px(width), LV_PART_INDICATOR);
     lv_obj_set_style_arc_color(a, lv_color_hex(track), LV_PART_MAIN);
     lv_obj_set_style_arc_opa(a, track ? LV_OPA_COVER : LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_arc_rounded(a, true, LV_PART_INDICATOR);
@@ -64,7 +69,7 @@ void Ui::setText(lv_obj_t* l, const std::string& s) {
 
 Ui::Ui(lv_obj_t* parent, const Fonts& f) : f_(f) {
     root_ = box(parent);
-    lv_obj_set_size(root_, 240, 240);
+    lv_obj_set_size(root_, px(240), px(240));
     lv_obj_center(root_);
     lv_obj_set_style_radius(root_, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_clip_corner(root_, true, 0);
@@ -79,7 +84,7 @@ Ui::Ui(lv_obj_t* parent, const Fonts& f) : f_(f) {
 
 void Ui::buildMain() {
     main_ = box(root_);
-    lv_obj_set_size(main_, 240, 240);
+    lv_obj_set_size(main_, px(240), px(240));
     // Ring: radius 113 to the middle of the 8 px stroke.
     ring_ = ring(main_, 234, 8, kTrack);
     // Thin inner ring: hold progress, "sent..." pulse, "not taken" flash.
@@ -87,21 +92,21 @@ void Ui::buildMain() {
     lv_obj_set_style_arc_rounded(inner_, false, LV_PART_INDICATOR);
 
     lv_obj_t* status = box(main_);
-    lv_obj_set_size(status, 120, 18);
-    lv_obj_align(status, LV_ALIGN_TOP_MID, 0, 28);
+    lv_obj_set_size(status, px(120), px(18));
+    lv_obj_align(status, LV_ALIGN_TOP_MID, 0, px(28));
     statusDot_ = box(status);
-    lv_obj_set_size(statusDot_, 8, 8);
+    lv_obj_set_size(statusDot_, px(8), px(8));
     lv_obj_set_style_radius(statusDot_, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(statusDot_, lv_color_hex(kGreen), 0);
     lv_obj_set_style_bg_opa(statusDot_, LV_OPA_COVER, 0);
-    lv_obj_align(statusDot_, LV_ALIGN_CENTER, -18, 0);
+    lv_obj_align(statusDot_, LV_ALIGN_CENTER, px(-18), 0);
     statusText_ = label(status, f_.b12, 0xffffff, 0);
     lv_label_set_text(statusText_, "CRG");
-    lv_obj_align(statusText_, LV_ALIGN_CENTER, 6, 0);
+    lv_obj_align(statusText_, LV_ALIGN_CENTER, px(6), 0);
     statusPill_ = box(status);
-    lv_obj_set_size(statusPill_, 92, 18);
+    lv_obj_set_size(statusPill_, px(92), px(18));
     lv_obj_center(statusPill_);
-    lv_obj_set_style_radius(statusPill_, 9, 0);
+    lv_obj_set_style_radius(statusPill_, px(9), 0);
     lv_obj_set_style_bg_color(statusPill_, lv_color_hex(kBlue), 0);
     lv_obj_set_style_bg_opa(statusPill_, LV_OPA_COVER, 0);
     pillText_ = label(statusPill_, f_.b12, 0x0b1a2a, 0);
@@ -112,50 +117,50 @@ void Ui::buildMain() {
     // Clock fonts hold only digits, so their line height is the digit
     // height: place clocks by their centre, not their top.
     clock_ = label(main_, f_.clock72, 0xffffff, 0);
-    lv_obj_align(clock_, LV_ALIGN_CENTER, 0, -14);
+    lv_obj_align(clock_, LV_ALIGN_CENTER, 0, px(-14));
     state_ = label(main_, f_.b17, kGreen, 146);
-    lv_obj_set_style_text_letter_space(state_, 2, 0);
+    lv_obj_set_style_text_letter_space(state_, px(2), 0);
     period_ = label(main_, f_.m14, kTextSoft, 170);
     hint_ = label(main_, f_.m12, kHint, 192);
 }
 
 void Ui::buildPicker() {
     picker_ = box(root_);
-    lv_obj_set_size(picker_, 240, 240);
+    lv_obj_set_size(picker_, px(240), px(240));
     static const uint32_t fill[4] = {0x17406e, 0x0f2c4d, 0x7a4310, 0x552e0a};
     static const char* const what[4] = {"TTO", "OR", "TTO", "OR"};
     for (int q = 0; q < 4; q++) {
         bool right = q >= 2, bottom = q % 2 == 1;
         lv_obj_t* r = box(picker_);
-        lv_obj_set_size(r, 118, 118);
-        lv_obj_set_pos(r, right ? 122 : 0, bottom ? 122 : 0);
+        lv_obj_set_size(r, px(118), px(118));
+        lv_obj_set_pos(r, px(right ? 122 : 0), px(bottom ? 122 : 0));
         lv_obj_set_style_bg_color(r, lv_color_hex(fill[q]), 0);
         lv_obj_set_style_bg_opa(r, LV_OPA_COVER, 0);
         // Text slightly towards the centre: the outer corners are off the round screen.
         int dx = right ? -4 : 4, dy = bottom ? -2 : 2;
         lv_obj_t* t = label(r, f_.m12, 0xffffff, 0);
         lv_label_set_text(t, right ? "TEAM 2" : "TEAM 1");
-        lv_obj_align(t, LV_ALIGN_CENTER, dx, dy - 10);
+        lv_obj_align(t, LV_ALIGN_CENTER, px(dx), px(dy - 10));
         lv_obj_t* w = label(r, f_.b17, 0xffffff, 0);
         lv_label_set_text(w, what[q]);
-        lv_obj_align(w, LV_ALIGN_CENTER, dx, dy + 8);
+        lv_obj_align(w, LV_ALIGN_CENTER, px(dx), px(dy + 8));
     }
     lv_obj_t* disc = box(picker_);
-    lv_obj_set_size(disc, 90, 90);
+    lv_obj_set_size(disc, px(90), px(90));
     lv_obj_center(disc);
     lv_obj_set_style_radius(disc, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(disc, lv_color_hex(0xe9e9e9), 0);
     lv_obj_set_style_bg_opa(disc, LV_OPA_COVER, 0);
     pickClock_ = label(disc, f_.clock27, 0x111111, 0);
-    lv_obj_align(pickClock_, LV_ALIGN_CENTER, 0, -10);
+    lv_obj_align(pickClock_, LV_ALIGN_CENTER, 0, px(-10));
     lv_obj_t* oto = label(disc, f_.b17, 0x111111, 0);
     lv_label_set_text(oto, "OTO");
-    lv_obj_align(oto, LV_ALIGN_CENTER, 0, 16);
+    lv_obj_align(oto, LV_ALIGN_CENTER, 0, px(16));
 }
 
 void Ui::buildNoConn() {
     noconn_ = box(root_);
-    lv_obj_set_size(noconn_, 240, 240);
+    lv_obj_set_size(noconn_, px(240), px(240));
     // Dashed red ring: 24 short arcs.
     for (int i = 0; i < 24; i++) {
         lv_obj_t* a = ring(noconn_, 234, 6, 0);
@@ -171,7 +176,7 @@ void Ui::buildNoConn() {
     lv_obj_t* s = label(noconn_, f_.m12, 0xffffff, 76);
     lv_label_set_text(s, "Buttons are not sent");
     lastClock_ = label(noconn_, f_.clock43, kGrey, 0);
-    lv_obj_align(lastClock_, LV_ALIGN_CENTER, 0, 2);
+    lv_obj_align(lastClock_, LV_ALIGN_CENTER, 0, px(2));
     lastWhat_ = label(noconn_, f_.m12, kGrey, 146);
     noconnHint_ = label(noconn_, f_.m12, 0xffffff, 176);
     lv_label_set_text(noconnHint_, "Hold Undo: run locally");
@@ -181,7 +186,7 @@ void Ui::buildNoConn() {
 // Same layout as the box timer's prompts (jt::Controller::promptHit).
 void Ui::buildRejoin() {
     rejoin_ = box(root_);
-    lv_obj_set_size(rejoin_, 240, 240);
+    lv_obj_set_size(rejoin_, px(240), px(240));
     lv_obj_t* q = label(rejoin_, f_.b17, 0xffffff, 66);
     lv_label_set_text(q, "Rejoin scoreboard?");
     lv_obj_t* s = label(rejoin_, f_.m12, kTextSoft, 94);
@@ -193,9 +198,9 @@ void Ui::buildRejoin() {
     } b[2] = {{38, kGreen, 0x000000, "Yes"}, {122, 0x2f2f33, 0xffffff, "No"}};
     for (auto& i : b) {
         lv_obj_t* o = box(rejoin_);
-        lv_obj_set_pos(o, i.x, 130);
-        lv_obj_set_size(o, 80, 48);
-        lv_obj_set_style_radius(o, 10, 0);
+        lv_obj_set_pos(o, px(i.x), px(130));
+        lv_obj_set_size(o, px(80), px(48));
+        lv_obj_set_style_radius(o, px(10), 0);
         lv_obj_set_style_bg_color(o, lv_color_hex(i.bg), 0);
         lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
         lv_obj_t* l = label(o, f_.b17, i.fg, 0);
@@ -244,7 +249,7 @@ void Ui::show(const View& v, uint32_t now) {
         lv_obj_set_style_text_color(statusText_, lv_color_hex(v.settingsWarning ? kAmber : 0xffffff), 0);
         lv_obj_set_style_bg_color(statusDot_, lv_color_hex(c), 0);
         lv_obj_update_layout(statusText_);
-        lv_obj_align_to(statusDot_, statusText_, LV_ALIGN_OUT_LEFT_MID, -6, 0);
+        lv_obj_align_to(statusDot_, statusText_, LV_ALIGN_OUT_LEFT_MID, px(-6), 0);
     }
 
     uint32_t tone = toneColor(v.tone);

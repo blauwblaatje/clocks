@@ -1,9 +1,12 @@
 """Firmware update end to end in the simulator (about 1 minute).
 
-    python3 update.py SIM FIRMWARE_BIN OUTDIR
+    python3 update.py SIM FIRMWARE_BIN OUTDIR [OTHER_BOARD_BIN]
 
-FIRMWARE_BIN is a real build (firmware/.pio/build/c6/firmware.bin), so the
-image header check sees an ESP32-C6 image. The script serves release files
+FIRMWARE_BIN is a real build for the board the simulator stands in for
+(firmware/.pio/build/c6/firmware.bin; with CLOCK_SIM_BOARD=stopwatch
+firmware/.pio/build/stopwatch/firmware.bin), so the image header and the
+board marker checks see a real image. OTHER_BOARD_BIN, the other board's
+build, adds the checks that it is refused. The script serves release files
 the way the install site does (web-installer/make_release.py) and runs a
 simulated CLOCK through the menu's Update and the setup page upload. The
 simulator's "slot" is ~/.cache/crg-sim-update.bin in its HOME; "restart"
@@ -14,10 +17,13 @@ import common as C
 from common import check, note, wait_for
 
 SIM, FW, OUT = sys.argv[1:4]
+OTHER = sys.argv[4] if len(sys.argv) > 4 else None
 os.makedirs(OUT, exist_ok=True)
 C.OUT = OUT
 fw = open(FW, "rb").read()
 sha = hashlib.sha256(fw).hexdigest()
+other = open(OTHER, "rb").read() if OTHER else None
+BOARD_ID = "m5-stopwatch" if C.BOARD in ("stopwatch", "m5-stopwatch") else "waveshare-c6"
 
 
 def latest(version, data=fw, digest=None, app="firmware.bin"):
@@ -35,7 +41,13 @@ FILES = {
     "/slow/latest.json": (latest("0.2.0"), None),
     "/slow/firmware.bin": (fw, 16384),
     "/junk/latest.json": (b"<html>not json</html>", None),
+    # the install site's layout: the device adds <board>/latest.json
+    f"/site/{BOARD_ID}/latest.json": (latest("0.2.0"), None),
+    f"/site/{BOARD_ID}/firmware.bin": (fw, None),
 }
+if other:
+    FILES["/other/latest.json"] = (latest("0.2.0", data=other), None)
+    FILES["/other/firmware.bin"] = (other, None)
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -205,6 +217,26 @@ try:
             shot(c, "check-404")
         finish(c)
 
+    print("\n== 6b. the install site as the address: this board's folder")
+    c = device("site", BASE + "/site/")
+    open_menu_item(c, UPDATE_ROW)
+    check(f"offers 0.2.0 from /site/{BOARD_ID}/latest.json", c.has("Update to 0.2.0?", timeout=5), c.text())
+    c.touch(*INSTALL)
+    check("installs and restarts", exited(c, 20) and slot(c) == fw)
+    finish(c)
+
+    if other:
+        print("\n== 6c. the other board's firmware: refused")
+        c = device("other", BASE + "/other/latest.json")
+        open_menu_item(c, UPDATE_ROW)
+        c.has("Update to 0.2.0?", timeout=5)
+        c.touch(*INSTALL)
+        check("fails with 'This firmware is for the ...'", c.has("Update failed", "This firmware is for the", timeout=15),
+              c.text())
+        shot(c, "other-board")
+        check("nothing installed, nothing left over", slot(c) is None and slot(c, ".part") is None)
+        finish(c)
+
     print("\n== 7. setup page upload")
     c = device("upload", "")
     open_menu_item(c, SETUP_ROW)
@@ -235,6 +267,17 @@ try:
     check("the device says so", c.has("Update failed", "not a firmware file", timeout=2), c.text())
     shot(c, "upload-wrong-file")
     c.press("crown")  # closes the update screen; setup stays open
+    if other:
+        res.clear()
+        t = threading.Thread(target=lambda: res.update(r=post(other)))
+        t.start()
+        while t.is_alive():
+            c.text()
+            time.sleep(0.05)
+        check("the other board's firmware.bin is refused (400)", res["r"][0] == 400 and "This firmware is for the" in res["r"][1],
+              str(res["r"]))
+        c.has("Update failed", timeout=2)
+        c.press("crown")
     res.clear()
     t = threading.Thread(target=lambda: res.update(r=post(fw)))
     t.start()

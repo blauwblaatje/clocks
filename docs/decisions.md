@@ -550,3 +550,36 @@ setup page installs any firmware.bin). Repository
 github.com/blauwblaatje/clocks (public, GPL-3.0 as the CRG scoreboard),
 case/out models included, crg-jam-timer.zip left out. v0.1.0 tagged:
 ghcr.io/blauwblaatje/clocks:0.1.0.
+
+## 2026-11-18: second board, M5Stack StopWatch
+Rogier: also make it work on the M5Stack StopWatch (ESP32-S3, 466 x 466
+AMOLED, two buttons and a power button, battery and motor built in). The
+firmware knows its board and checks for that board's firmware online.
+Decided by Rogier:
+- Screens are scaled, not the picture: every size through `ui::px`
+  (466/240), fonts generated at the scaled sizes (lib/jtfonts466).
+- Which button is the crown: decided with the device in hand. For now the
+  power button (yellow = 10 o'clock, blue = 2 o'clock), one constant in
+  board_m5_stopwatch.cpp.
+Built (choices made while building, for Rogier to check):
+- One firmware per board, one shared code base: `src/board.h` with
+  board_waveshare_c6.cpp and board_m5_stopwatch.cpp, PlatformIO envs `c6`
+  and `stopwatch`. The simulator: `--board stopwatch`.
+- Board identity `upd::Board` (id, name, chip). Every image carries
+  "CLOCK-BOARD=<id>;"; an update or upload must have the device's own chip
+  in the header and its own marker, so firmware for the other board is
+  refused even on the same chip. The Waveshare also takes images without a
+  marker (0.1.0); the StopWatch does not.
+- Release address is now the install site (default
+  https://clock.quagga.rocks/); the device adds `<board id>/latest.json`.
+  An address ending in .json is used as it stands. A saved 0.1.0 default
+  becomes the site. The site keeps the Waveshare's latest.json and
+  firmware.bin at the top for 0.1.0 devices; manifest.json has a build per
+  chip, so one install button serves both boards.
+- StopWatch power button as a game button: its chip's click-reset and
+  double-click power-off are turned off (as M5Stack's demo does for the
+  first). Sleep = power off through the chip; the power button starts it
+  again. "On USB" = 5 V on the port (the chip sees it, chargers included);
+  charging is shown.
+- Not built: the vibration motor (as on the Waveshare, the cues are still
+  missing), the CST9217 touch variant some units have.

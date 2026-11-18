@@ -1,7 +1,14 @@
 # CLOCK: CRG-Linked Officials' Clock Kit
 
-ESP32-C6 stopwatch-style controller for the CRG roller derby scoreboard:
-jam timer and penalty box timer in one device and one firmware.
+Stopwatch-style controller for the CRG roller derby scoreboard: jam timer
+and penalty box timer in one device and one firmware. Runs on two boards,
+each with its own build of that firmware:
+
+- Waveshare ESP32-C6-Touch-LCD-1.28 (240 x 240) in the CLOCK case (case/);
+- M5Stack StopWatch (ESP32-S3, 466 x 466 AMOLED), in its own housing.
+
+The screens are designed at 240 x 240 and scaled on the bigger display;
+updates and uploads only take firmware for the board they run on.
 
 Start with HANDOVER.md. Then docs/protocol.md (CRG WebSocket protocol, read
 from the scoreboard source) and docs/display.md (the screens).
@@ -14,7 +21,7 @@ from the scoreboard source) and docs/display.md (the screens).
 | CRG protocol, box timer | Read from source, captured 2026-11-10 (protocol.md section 12). |
 | CRG client core | `firmware/lib/crgclient`, host tests and a live test against a local CRG pass. No socket code yet. |
 | Standalone jam timer logic | Done, host tests pass. |
-| Firmware for the board | Compiles for the ESP32-C6 (`pio run -e c6`), never run: display driver, touch, backlight, battery still to do. |
+| Firmware for the boards | Compiles for both (`pio run -e c6` Waveshare, `pio run -e stopwatch` M5Stack StopWatch); never run on either. |
 | Jam timer, box timer and menu screens | Built in LVGL, run in the desktop simulator (sim/, `--role`). |
 | Setup page, firmware updates | Setup page and Wi-Fi settings built; updates (menu and setup page upload) run end to end in the simulator, compile for the board (tools/game-test/update.py). |
 | Case | v0 fit-test model, not printed, no switch pockets. |
@@ -36,7 +43,7 @@ from the scoreboard source) and docs/display.md (the screens).
     g++ -std=c++17 -Wall -pthread -Ilib/wsposix test/native/test_wsposix.cpp lib/wsposix/wsposix.cpp -o /tmp/tw && /tmp/tw
     g++ -std=c++17 -Wall -Ilib/update -Ilib/crgclient test/native/test_update.cpp lib/update/*.cpp lib/crgclient/crgjson.cpp -o /tmp/tu && /tmp/tu
 
-Desktop simulator: sim/README.md.
+Desktop simulator: sim/README.md (`--board stopwatch` for the StopWatch's screens).
 
 Live test of the client core against a throwaway CRG on port 4331
 (tools/crg-capture/README.md says how to start one):

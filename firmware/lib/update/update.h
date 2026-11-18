@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string>
+#include <vector>
 
 #include "sha256.h"
 
@@ -29,9 +30,43 @@ bool newer(const std::string& offered, const std::string& current);
 // The app's address, relative to latest.json's.
 std::string resolve(const std::string& base, const std::string& ref);
 
-// The start of an ESP32-C6 app image: magic 0xE9 and chip id 13. "" = fine.
+// The boards CLOCK runs on. Each has its own firmware: the chip differs, and
+// so do the drivers. A firmware carries "CLOCK-BOARD=<id>;" somewhere in its
+// image (kBoardMarkerPrefix, written by the board code), so an update or an
+// upload for another board is refused even when the chip is the same.
+struct Board {
+    const char* id;   // release folder on the install site, e.g. "waveshare-c6"
+    const char* name; // for messages
+    uint16_t chip;    // ESP image header chip id: ESP32-C6 13, ESP32-S3 9
+    bool legacy;      // also takes images without a marker (0.1.0 was built for this board only)
+};
+extern const Board kWaveshareC6, kStopWatch;
+const Board* findBoard(const std::string& id); // nullptr = unknown
+#define CLOCK_BOARD_MARKER_PREFIX "CLOCK-BOARD="
+
+// Where the device looks for updates. The setting is the install site
+// ("https://clock.quagga.rocks/"): the device adds "<board id>/latest.json".
+// A setting that names a .json file is used as it stands (a test server).
+std::string releaseUrl(const std::string& setting, const Board& b);
+
+// The start of an app image: magic 0xE9 and the board's chip id. "" = fine.
 static const size_t kImageHeader = 16;
-std::string checkImage(const uint8_t* p, size_t n);
+std::string checkImage(const uint8_t* p, size_t n, const Board& b);
+
+// Finds the board markers in an image fed to it in pieces.
+class MarkerScan {
+  public:
+    void reset();
+    void feed(const uint8_t* p, size_t n);
+    // "" = the image is for b, else why not
+    std::string verdict(const Board& b) const;
+
+  private:
+    size_t matched_ = 0; // characters of the prefix matched so far
+    bool inId_ = false;
+    std::string id_;
+    std::vector<std::string> found_; // board ids seen, in order
+};
 
 // The inactive app slot.
 class Slot {
@@ -47,7 +82,7 @@ class Slot {
 // all three are right.
 class Writer {
   public:
-    explicit Writer(Slot& s) : slot_(s) {}
+    Writer(Slot& s, const Board& b) : slot_(s), board_(b) {}
     std::string begin(size_t size, const std::string& sha256hex); // sha "" = none (upload)
     std::string write(const uint8_t* data, size_t len);
     std::string finish();
@@ -58,6 +93,8 @@ class Writer {
 
   private:
     Slot& slot_;
+    const Board& board_;
+    MarkerScan marks_;
     Sha256 sha_;
     std::string want_;
     uint8_t head_[kImageHeader];
@@ -94,6 +131,7 @@ class Host {
     virtual Slot& slot() = 0;
     virtual Conditions conditions() = 0;
     virtual std::string version() = 0; // running firmware
+    virtual const Board& board() = 0;  // the board this firmware runs on
 };
 
 enum class State : uint8_t { Idle, Checking, UpToDate, Available, Downloading, Receiving, Installed, Failed };
@@ -102,7 +140,7 @@ enum class State : uint8_t { Idle, Checking, UpToDate, Available, Downloading, R
 // upload from the setup page. One at a time.
 class Flow {
   public:
-    explicit Flow(Host& h) : h_(h), w_(h.slot()) {}
+    explicit Flow(Host& h) : h_(h), w_(h.slot(), h.board()) {}
     void check(const std::string& url, uint32_t now);
     std::string install(uint32_t now); // "" = started, else why not (state stays Available)
     void cancel();                     // stops a check or download; the old firmware stays

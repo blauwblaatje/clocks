@@ -11,16 +11,28 @@ esp-web-install-button button{padding:10px 18px;font-size:1em}
 </style></head><body>
 <h1>CLOCK firmware</h1><p><small>CRG-Linked Officials' Clock Kit</small></p>
 <p>Version <b id="version">…</b></p>
+<p>CLOCK runs on two boards, each with its own firmware:</p>
+<ul>
+<li>Waveshare ESP32-C6-Touch-LCD-1.28 (in the CLOCK case)</li>
+<li>M5Stack StopWatch (ESP32-S3)</li>
+</ul>
 <h2>Install over USB</h2>
 <p>Connect the timer with a USB-C cable and press the button. Needs Chrome or Edge on a computer
-(Web Serial). This is also how the very first install is done.</p>
+(Web Serial). This is also how the very first install is done. The page sees which chip it is
+talking to and installs that board's firmware.</p>
 <esp-web-install-button manifest="manifest.json"></esp-web-install-button>
 <h2>Update without a cable</h2>
-<p>On the timer: menu, Connection, Update (looks here when the timer has internet), or download
-<a href="firmware.bin" download>firmware.bin</a> and upload it on the timer's setup page.</p>
-<p><small>For the timer: <code>latest.json</code> holds the version, size and SHA-256 of
-<code>firmware.bin</code>.</small></p>
+<p>On the timer: menu, Connection, Update (looks here when the timer has internet, and only at
+its own board's firmware), or download the firmware for your board and upload it on the timer's
+setup page:</p>
+<ul>
+<li>Waveshare ESP32-C6: <a href="waveshare-c6/firmware.bin" download>firmware.bin</a></li>
+<li>M5Stack StopWatch: <a href="m5-stopwatch/firmware.bin" download>firmware.bin</a></li>
+</ul>
+<p>A timer refuses firmware made for the other board.</p>
+<p><small>For the timers: <code>&lt;board&gt;/latest.json</code> holds the version, size and SHA-256 of
+that board's <code>firmware.bin</code>.</small></p>
 <script>
-fetch("latest.json").then(r => r.json()).then(j => { document.getElementById("version").textContent = j.version; });
+fetch("waveshare-c6/latest.json").then(r => r.json()).then(j => { document.getElementById("version").textContent = j.version; });
 </script>
 </body></html>

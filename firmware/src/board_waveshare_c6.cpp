@@ -1,12 +1,27 @@
+// Waveshare ESP32-C6-Touch-LCD-1.28: GC9A01 display (through Arduino_GFX),
+// CST816S touch, backlight PWM, battery on the ADC, three switches on the
+// header. Compiles; not run on the board yet.
 #include "board.h"
 
 #include <Arduino.h>
 #include <Arduino_GFX_Library.h>
 #include <Wire.h>
+#include <driver/usb_serial_jtag.h>
+#include <esp_sleep.h>
 
-#include "pins.h"
+#include "pins_waveshare_c6.h"
 
 namespace board {
+
+const upd::Board& kBoard = upd::kWaveshareC6;
+__attribute__((used)) const char kMarker[] = CLOCK_BOARD_MARKER_PREFIX "waveshare-c6;";
+const int kSize = 240;
+
+// The board sits in the case a quarter turn round (USB at 3 o'clock seen from
+// the front, the board's own "down" is its USB side). Picture and touch are
+// turned by the same amount. If the picture comes out upside down on the
+// first run, change kRotation from 1 to 3; touch follows automatically.
+static constexpr uint8_t kRotation = 1;
 
 static const int kW = 240, kH = 240;
 static const int kBufLines = 24; // 240 x 24 x 2 bytes x 2 = 23 KB, not a full frame
@@ -17,7 +32,8 @@ static Arduino_HWSPI bus(PIN_LCD_DC, PIN_LCD_CS, PIN_LCD_SCLK, PIN_LCD_MOSI, -1)
 // GC9A01 with IPS colour inversion, as in Waveshare's Arduino_GFX example.
 static Arduino_GC9A01 lcd(&bus, PIN_LCD_RST, kRotation, true, kW, kH);
 
-void rotateTouch(uint8_t r, int nx, int ny, int& lx, int& ly) {
+// Touch coordinates from the panel's own frame to the screen's (rotation).
+static void rotateTouch(uint8_t r, int nx, int ny, int& lx, int& ly) {
     switch (r & 3) {
     case 0: lx = nx, ly = ny; break;
     case 1: lx = ny, ly = kW - 1 - nx; break;
@@ -27,6 +43,7 @@ void rotateTouch(uint8_t r, int nx, int ny, int& lx, int& ly) {
 }
 
 void begin() {
+    for (int pin : {PIN_BTN_CROWN, PIN_BTN_UNDO, PIN_BTN_TIMEOUT}) pinMode(pin, INPUT_PULLUP);
     ledcAttach(PIN_LCD_BL, kBacklightHz, 10);
     ledcWrite(PIN_LCD_BL, 0); // dark until the first frame
     lcd.begin();
@@ -104,27 +121,40 @@ lv_indev_t* createTouch() {
     return t;
 }
 
-// Single-cell LiPo at light load: rough voltage-to-charge table.
-static int lipoPercent(int mv) {
-    static const int table[][2] = {{4180, 100}, {4100, 90}, {4000, 80}, {3920, 70}, {3850, 60}, {3800, 50},
-                                   {3750, 40}, {3710, 30}, {3670, 20}, {3610, 10}, {3500, 5},  {3300, 0}};
-    if (mv >= table[0][0]) return 100;
-    for (size_t i = 1; i < sizeof table / sizeof table[0]; i++) {
-        if (mv >= table[i][0]) {
-            int v0 = table[i][0], v1 = table[i - 1][0], p0 = table[i][1], p1 = table[i - 1][1];
-            return p0 + (mv - v0) * (p1 - p0) / (v1 - v0);
-        }
-    }
-    return 0;
+uint8_t buttons() {
+    // Crown at 12, undo at 10 (left), timeout/pause at 2 (right), seen from the front.
+    return (digitalRead(PIN_BTN_CROWN) == LOW ? kCrown : 0) | (digitalRead(PIN_BTN_UNDO) == LOW ? kLeft : 0) |
+           (digitalRead(PIN_BTN_TIMEOUT) == LOW ? kRight : 0);
 }
 
-bool battery(int& mv, int& pct) {
+bool battery(int& mv, int& pct, bool& charging) {
+    charging = false; // the board has no charge-status pin (only the CHG LED)
     uint32_t sum = 0;
     for (int i = 0; i < 8; i++) sum += analogReadMilliVolts(PIN_BAT_ADC);
     mv = (int)(sum / 8 * BAT_DIVIDER);
     if (mv < 2500 || mv > 4500) return false; // no battery, or not measured right
     pct = lipoPercent(mv);
     return true;
+}
+
+// A computer on the USB port: the board has no pin for a plain charger.
+bool usbPower() { return usb_serial_jtag_is_connected(); }
+
+void sleep() {
+    // Wake on the crown (IO1 is a low-power GPIO, so ext1 can wake on it).
+    // TODO: require the 1 s hold after waking (check on wake, else sleep again).
+    displayOff();
+    esp_sleep_enable_ext1_wakeup_io(1ULL << PIN_BTN_CROWN, ESP_EXT1_WAKEUP_ANY_LOW);
+    esp_deep_sleep_start();
+    for (;;) {
+    }
+}
+
+std::vector<std::string> info() {
+    int mv = 0, pct = 0;
+    bool charging = false;
+    if (!battery(mv, pct, charging)) return {"Battery: no reading"};
+    return {"Battery: " + std::to_string(pct) + " % (" + std::to_string(mv) + " mV)"};
 }
 
 } // namespace board

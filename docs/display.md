@@ -2,7 +2,13 @@
 
 Target: 240 x 240 round GC9A01, picture and touch rotated 90 degrees
 (the board is mounted with USB-C at 3 o'clock). All sizes below are in real
-display pixels. Font used in the mockups: Montserrat 500/600/700 (LVGL ships
+display pixels on that board.
+
+M5Stack StopWatch (466 x 466 AMOLED, 2026-11-18): the same screens, every
+size times 466/240 (`ui::px` in firmware/lib/jtui/scale.h) and fonts
+generated at the matching sizes (firmware/lib/jtfonts466). Touch goes back
+to these 240 x 240 coordinates before the controllers see it, so all
+positions in this file hold for both boards. Font used in the mockups: Montserrat 500/600/700 (LVGL ships
 Montserrat). Clock digits are tabular.
 
 The mockups live in a Claude design canvas ("Jam timer display screens",

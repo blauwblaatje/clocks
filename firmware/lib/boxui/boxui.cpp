@@ -1,4 +1,7 @@
 #include "boxui.h"
+#include "scale.h"
+
+using ui::px;
 
 namespace box {
 
@@ -37,8 +40,8 @@ lv_obj_t* box(lv_obj_t* parent, int x, int y, int w, int h, uint32_t color, bool
     lv_obj_remove_style_all(o);
     lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_remove_flag(o, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_pos(o, x, y);
-    lv_obj_set_size(o, w, h);
+    lv_obj_set_pos(o, px(x), px(y));
+    lv_obj_set_size(o, px(w), px(h));
     if (filled) {
         lv_obj_set_style_bg_color(o, lv_color_hex(color), 0);
         lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
@@ -52,15 +55,15 @@ void setText(lv_obj_t* l, const std::string& s) {
 
 lv_obj_t* arc(lv_obj_t* parent, int d, int w) {
     lv_obj_t* a = lv_arc_create(parent);
-    lv_obj_set_size(a, d, d);
+    lv_obj_set_size(a, px(d), px(d));
     lv_obj_center(a);
     lv_obj_remove_flag(a, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_style(a, nullptr, LV_PART_KNOB);
     lv_arc_set_rotation(a, 270);
     lv_arc_set_bg_angles(a, 0, 360);
     lv_arc_set_range(a, 0, 1000);
-    lv_obj_set_style_arc_width(a, w, LV_PART_MAIN);
-    lv_obj_set_style_arc_width(a, w, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_width(a, px(w), LV_PART_MAIN);
+    lv_obj_set_style_arc_width(a, px(w), LV_PART_INDICATOR);
     lv_obj_set_style_arc_color(a, lv_color_hex(kTrack), LV_PART_MAIN);
     lv_obj_set_style_arc_rounded(a, true, LV_PART_INDICATOR);
     lv_obj_set_style_pad_all(a, 0, 0);
@@ -113,20 +116,20 @@ void Ui::build(const View& v) {
         bool rj = v.screen == Screen::RejoinPrompt;
         lv_obj_t* q = label(root_, f_.b17, 0xffffff);
         lv_label_set_text(q, rj ? "Rejoin scoreboard?" : "Swap sides?");
-        lv_obj_align(q, LV_ALIGN_TOP_MID, 0, rj ? 66 : 70);
+        lv_obj_align(q, LV_ALIGN_TOP_MID, 0, px(rj ? 66 : 70));
         lv_obj_t* s = label(root_, f_.m12, 0xd6d6d6);
         lv_label_set_text(s, rj                         ? "Local clocks stop,\nthe scoreboard's show"
                              : v.role == Role::Jammers ? "Teams change ends"
                                                        : "Time the other team");
         lv_obj_set_style_text_align(s, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(s, LV_ALIGN_TOP_MID, 0, rj ? 92 : 98);
+        lv_obj_align(s, LV_ALIGN_TOP_MID, 0, px(rj ? 92 : 98));
         lv_obj_t* yes = box(root_, 38, 130, 80, 48, kDone);
-        lv_obj_set_style_radius(yes, 10, 0);
+        lv_obj_set_style_radius(yes, px(10), 0);
         lv_obj_t* yl = label(yes, f_.b17, 0x000000);
         lv_label_set_text(yl, "Yes");
         lv_obj_center(yl);
         lv_obj_t* no = box(root_, 122, 130, 80, 48, kButton);
-        lv_obj_set_style_radius(no, 10, 0);
+        lv_obj_set_style_radius(no, px(10), 0);
         lv_obj_t* nl = label(no, f_.b17, 0xffffff);
         lv_label_set_text(nl, "No");
         lv_obj_center(nl);
@@ -137,11 +140,11 @@ void Ui::build(const View& v) {
     notice_ = label(root_, f_.m13, 0xffffff);
     lv_obj_set_style_bg_color(notice_, lv_color_hex(0x202024), 0);
     lv_obj_set_style_bg_opa(notice_, LV_OPA_90, 0);
-    lv_obj_set_style_pad_hor(notice_, 10, 0);
-    lv_obj_set_style_pad_ver(notice_, 6, 0);
-    lv_obj_set_style_radius(notice_, 10, 0);
+    lv_obj_set_style_pad_hor(notice_, px(10), 0);
+    lv_obj_set_style_pad_ver(notice_, px(6), 0);
+    lv_obj_set_style_radius(notice_, px(10), 0);
     lv_obj_set_style_border_color(notice_, lv_color_hex(0x6fb6ff), 0);
-    lv_obj_set_style_border_width(notice_, 1, 0);
+    lv_obj_set_style_border_width(notice_, px(1), 0);
     lv_obj_center(notice_);
     lv_obj_add_flag(notice_, LV_OBJ_FLAG_HIDDEN);
     // Hold progress: thin ring at the edge, on every screen.
@@ -155,17 +158,17 @@ void Ui::buildBlockers(int n) {
         // Jam-timer layout: status, roster number, clock, state word, hint; ring.
         ring_ = arc(root_, 234, 8);
         status_ = label(root_, f_.m12, 0xd6d6d6);
-        lv_obj_align(status_, LV_ALIGN_TOP_MID, 0, 30);
+        lv_obj_align(status_, LV_ALIGN_TOP_MID, 0, px(30));
         Band& b = bands_[0];
         b.number = label(root_, f_.b29, 0xffffff);
-        lv_obj_align(b.number, LV_ALIGN_TOP_MID, 0, 48);
+        lv_obj_align(b.number, LV_ALIGN_TOP_MID, 0, px(48));
         b.clock = label(root_, f_.clock72, 0xffffff);
-        lv_obj_align(b.clock, LV_ALIGN_CENTER, 0, 4);
+        lv_obj_align(b.clock, LV_ALIGN_CENTER, 0, px(4));
         b.state = label(root_, f_.b17, 0xffffff);
-        lv_obj_set_style_text_letter_space(b.state, 2, 0);
-        lv_obj_align(b.state, LV_ALIGN_TOP_MID, 0, 158);
+        lv_obj_set_style_text_letter_space(b.state, px(2), 0);
+        lv_obj_align(b.state, LV_ALIGN_TOP_MID, 0, px(158));
         hint_ = label(root_, f_.m12, 0xb4b4b4);
-        lv_obj_align(hint_, LV_ALIGN_TOP_MID, 0, 182);
+        lv_obj_align(hint_, LV_ALIGN_TOP_MID, 0, px(182));
         return;
     }
     if (n == 2) {
@@ -179,9 +182,9 @@ void Ui::buildBlockers(int n) {
             b.state = label(b.fill, f_.b12, 0xffffff);
             // keep the text away from the curved edge: towards the strip
             int base = i == 0 ? 40 : 6;
-            lv_obj_align(b.number, LV_ALIGN_TOP_MID, -72, base + 14);
-            lv_obj_align(b.clock, LV_ALIGN_TOP_MID, 34, base + 6);
-            lv_obj_align(b.state, LV_ALIGN_TOP_MID, 34, base + 50);
+            lv_obj_align(b.number, LV_ALIGN_TOP_MID, px(-72), px(base + 14));
+            lv_obj_align(b.clock, LV_ALIGN_TOP_MID, px(34), px(base + 6));
+            lv_obj_align(b.state, LV_ALIGN_TOP_MID, px(34), px(base + 50));
         }
     } else {
         // Three bands 75 / 85 / 75 with 3 px gaps.
@@ -194,15 +197,15 @@ void Ui::buildBlockers(int n) {
             b.clock = label(b.fill, small ? f_.clock36 : f_.clock51, 0xffffff);
             if (!small) b.state = label(b.fill, f_.b12, 0xffffff);
             if (i == 0) {
-                lv_obj_align(b.number, LV_ALIGN_BOTTOM_MID, -46, -12);
-                lv_obj_align(b.clock, LV_ALIGN_BOTTOM_MID, 26, -12);
+                lv_obj_align(b.number, LV_ALIGN_BOTTOM_MID, px(-46), px(-12));
+                lv_obj_align(b.clock, LV_ALIGN_BOTTOM_MID, px(26), px(-12));
             } else if (i == 2) {
-                lv_obj_align(b.number, LV_ALIGN_TOP_MID, -46, 12);
-                lv_obj_align(b.clock, LV_ALIGN_TOP_MID, 26, 12);
+                lv_obj_align(b.number, LV_ALIGN_TOP_MID, px(-46), px(12));
+                lv_obj_align(b.clock, LV_ALIGN_TOP_MID, px(26), px(12));
             } else {
-                lv_obj_align(b.number, LV_ALIGN_LEFT_MID, 22, -4);
-                lv_obj_align(b.clock, LV_ALIGN_CENTER, 30, -8);
-                lv_obj_align(b.state, LV_ALIGN_CENTER, 30, 26);
+                lv_obj_align(b.number, LV_ALIGN_LEFT_MID, px(22), px(-4));
+                lv_obj_align(b.clock, LV_ALIGN_CENTER, px(30), px(-8));
+                lv_obj_align(b.state, LV_ALIGN_CENTER, px(30), px(26));
             }
         }
     }
@@ -210,8 +213,8 @@ void Ui::buildBlockers(int n) {
         statusDot_ = box(root_, 0, 0, 8, 8, kGreenDot);
         lv_obj_set_style_radius(statusDot_, LV_RADIUS_CIRCLE, 0);
         status_ = label(root_, f_.m12, 0xffffff);
-        lv_obj_align(status_, LV_ALIGN_CENTER, 6, 0);
-        lv_obj_align_to(statusDot_, status_, LV_ALIGN_OUT_LEFT_MID, -5, 0);
+        lv_obj_align(status_, LV_ALIGN_CENTER, px(6), 0);
+        lv_obj_align_to(statusDot_, status_, LV_ALIGN_OUT_LEFT_MID, px(-5), 0);
     }
 }
 
@@ -224,22 +227,22 @@ void Ui::buildJammers() {
         b.team = label(b.fill, f_.b12, 0xffffff);
         lv_obj_set_style_bg_color(b.team, lv_color_hex(chip[i]), 0);
         lv_obj_set_style_bg_opa(b.team, LV_OPA_COVER, 0);
-        lv_obj_set_style_pad_hor(b.team, 6, 0);
-        lv_obj_set_style_pad_ver(b.team, 2, 0);
-        lv_obj_set_style_radius(b.team, 4, 0);
-        lv_obj_align(b.team, LV_ALIGN_TOP_MID, cx, 46);
+        lv_obj_set_style_pad_hor(b.team, px(6), 0);
+        lv_obj_set_style_pad_ver(b.team, px(2), 0);
+        lv_obj_set_style_radius(b.team, px(4), 0);
+        lv_obj_align(b.team, LV_ALIGN_TOP_MID, px(cx), px(46));
         b.number = label(b.fill, f_.b23, 0xffffff);
-        lv_obj_align(b.number, LV_ALIGN_TOP_MID, cx, 74);
+        lv_obj_align(b.number, LV_ALIGN_TOP_MID, px(cx), px(74));
         b.clock = label(b.fill, f_.clock43, 0xffffff);
-        lv_obj_align(b.clock, LV_ALIGN_CENTER, cx, 12);
+        lv_obj_align(b.clock, LV_ALIGN_CENTER, px(cx), px(12));
         b.state = label(b.fill, f_.b12, 0xffffff);
-        lv_obj_set_width(b.state, 96);
+        lv_obj_set_width(b.state, px(96));
         lv_label_set_long_mode(b.state, LV_LABEL_LONG_WRAP);
-        lv_obj_align(b.state, LV_ALIGN_TOP_MID, cx, 150);
+        lv_obj_align(b.state, LV_ALIGN_TOP_MID, px(cx), px(150));
         emptyText_[i] = label(b.fill, f_.m12, 0x9a9a9a);
-        lv_obj_set_width(emptyText_[i], 84);
+        lv_obj_set_width(emptyText_[i], px(84));
         lv_label_set_long_mode(emptyText_[i], LV_LABEL_LONG_WRAP);
-        lv_obj_align(emptyText_[i], LV_ALIGN_CENTER, cx, 10);
+        lv_obj_align(emptyText_[i], LV_ALIGN_CENTER, px(cx), px(10));
     }
     // Status and hint sit over both halves: give them a dark backing.
     status_ = label(root_, f_.m12, 0xd6d6d6);
@@ -247,28 +250,28 @@ void Ui::buildJammers() {
     for (lv_obj_t* l : {status_, hint_}) {
         lv_obj_set_style_bg_color(l, lv_color_black(), 0);
         lv_obj_set_style_bg_opa(l, LV_OPA_70, 0);
-        lv_obj_set_style_pad_hor(l, 6, 0);
-        lv_obj_set_style_pad_ver(l, 1, 0);
-        lv_obj_set_style_radius(l, 4, 0);
+        lv_obj_set_style_pad_hor(l, px(6), 0);
+        lv_obj_set_style_pad_ver(l, px(1), 0);
+        lv_obj_set_style_radius(l, px(4), 0);
     }
-    lv_obj_align(status_, LV_ALIGN_TOP_MID, 0, 22);
-    lv_obj_align(hint_, LV_ALIGN_TOP_MID, 0, 202);
+    lv_obj_align(status_, LV_ALIGN_TOP_MID, 0, px(22));
+    lv_obj_align(hint_, LV_ALIGN_TOP_MID, 0, px(202));
 }
 
 void Ui::buildPicker() {
     pickTitle_ = label(root_, f_.m13, 0xffffff);
-    lv_obj_align(pickTitle_, LV_ALIGN_TOP_MID, 0, 44);
+    lv_obj_align(pickTitle_, LV_ALIGN_TOP_MID, 0, px(44));
     const int xs[2] = {42, 123}, ys[2] = {68, 123};
     for (int i = 0; i < 4; i++) {
         pick_[i] = box(root_, xs[i % 2], ys[i / 2], 75, 49, kButton);
-        lv_obj_set_style_radius(pick_[i], 8, 0);
+        lv_obj_set_style_radius(pick_[i], px(8), 0);
         pickLabel_[i] = label(pick_[i], f_.m12, 0xd6d6d6);
-        lv_obj_align(pickLabel_[i], LV_ALIGN_TOP_MID, 0, 5);
+        lv_obj_align(pickLabel_[i], LV_ALIGN_TOP_MID, 0, px(5));
         pickNumber_[i] = label(pick_[i], f_.b20, 0xffffff);
-        lv_obj_align(pickNumber_[i], LV_ALIGN_BOTTOM_MID, 0, -4);
+        lv_obj_align(pickNumber_[i], LV_ALIGN_BOTTOM_MID, 0, px(-4));
     }
     lv_obj_t* later = box(root_, 60, 182, 120, 28, kButton);
-    lv_obj_set_style_radius(later, 14, 0);
+    lv_obj_set_style_radius(later, px(14), 0);
     lv_obj_t* t = label(later, f_.m12, 0xffffff);
     lv_label_set_text(t, "Decide later");
     lv_obj_center(t);
@@ -276,9 +279,9 @@ void Ui::buildPicker() {
 
 void Ui::buildMenu() {
     menuNumber_ = label(root_, f_.b23, 0xffffff);
-    lv_obj_align(menuNumber_, LV_ALIGN_TOP_MID, -40, 48);
+    lv_obj_align(menuNumber_, LV_ALIGN_TOP_MID, px(-40), px(48));
     menuClock_ = label(root_, f_.clock36, 0xffffff);
-    lv_obj_align(menuClock_, LV_ALIGN_TOP_MID, 36, 44);
+    lv_obj_align(menuClock_, LV_ALIGN_TOP_MID, px(36), px(44));
     struct B {
         int x, y, w, h;
         uint32_t fill, text;
@@ -289,7 +292,7 @@ void Ui::buildMenu() {
                {121, 176, 67, 30, kButton, 0xffffff, "Cancel"}};
     for (int i = 0; i < 4; i++) {
         lv_obj_t* o = box(root_, bs[i].x, bs[i].y, bs[i].w, bs[i].h, bs[i].fill);
-        lv_obj_set_style_radius(o, 8, 0);
+        lv_obj_set_style_radius(o, px(8), 0);
         lv_obj_t* t = label(o, i < 2 ? f_.b17 : f_.m13, bs[i].text);
         lv_label_set_text(t, bs[i].t);
         lv_obj_center(t);
@@ -310,13 +313,13 @@ void Ui::buildNoConn(const View& v) {
     }
     lv_obj_t* t = label(root_, f_.b27, kRed);
     lv_label_set_text(t, "NO CONN");
-    lv_obj_align(t, LV_ALIGN_TOP_MID, 0, 62);
+    lv_obj_align(t, LV_ALIGN_TOP_MID, 0, px(62));
     lv_obj_t* s = label(root_, f_.m12, 0xffffff);
     lv_label_set_text(s, "Buttons are not sent");
-    lv_obj_align(s, LV_ALIGN_TOP_MID, 0, 98);
+    lv_obj_align(s, LV_ALIGN_TOP_MID, 0, px(98));
     lv_obj_t* h = label(root_, f_.m12, 0xffffff);
     lv_label_set_text(h, v.role == Role::Jammers ? "Hold crown: run locally" : "Hold 10 o'clock: run locally");
-    lv_obj_align(h, LV_ALIGN_TOP_MID, 0, 150);
+    lv_obj_align(h, LV_ALIGN_TOP_MID, 0, px(150));
 }
 
 void Ui::updateBand(Band& b, const Slot& s, bool small, const View& v) {
@@ -373,7 +376,7 @@ void Ui::show(const View& v, uint32_t now) {
     if (statusDot_) {
         lv_obj_set_style_bg_color(statusDot_, lv_color_hex(v.mode == Mode::Connected ? kGreenDot : kBlue), 0);
         lv_obj_update_layout(status_);
-        lv_obj_align_to(statusDot_, status_, LV_ALIGN_OUT_LEFT_MID, -5, 0);
+        lv_obj_align_to(statusDot_, status_, LV_ALIGN_OUT_LEFT_MID, px(-5), 0);
     }
     setText(hint_, v.hint);
     if (notice_) {
@@ -430,7 +433,7 @@ void Ui::show(const View& v, uint32_t now) {
         setText(menuNumber_, v.menuNumber);
         setText(menuClock_, v.menuClock);
         // standalone clocks have no roster number: centre the clock
-        lv_obj_align(menuClock_, LV_ALIGN_TOP_MID, v.menuNumber.empty() ? 0 : 36, 44);
+        lv_obj_align(menuClock_, LV_ALIGN_TOP_MID, px(v.menuNumber.empty() ? 0 : 36), px(44));
         lv_obj_set_style_bg_opa(menuPenalty_, v.menuCanPenalty ? LV_OPA_COVER : LV_OPA_30, 0);
         lv_obj_set_style_bg_opa(menuChange_, v.menuCanChange ? LV_OPA_COVER : LV_OPA_30, 0);
         break;

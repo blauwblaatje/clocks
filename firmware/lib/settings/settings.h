@@ -28,8 +28,9 @@ struct Settings {
     bool motorFitted = false;
     int brightness = 100;
     int sleepMinutes = 10; // sleep after this long idle (no clock, no press); 0 = never
-    // Release file for the menu's Update (web-installer/make_release.py); "" = none
-    std::string updateUrl = "https://clock.quagga.rocks/latest.json";
+    // Install site for the menu's Update: the device adds "<board>/latest.json"
+    // (upd::releaseUrl); a .json address is used as it stands; "" = none
+    std::string updateUrl = "https://clock.quagga.rocks/";
     // standalone (jam timer)
     uint32_t jamMs = 120000, lineupMs = 30000, timeoutMs = 60000, periodMs = 1800000;
     int periods = 2;

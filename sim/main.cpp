@@ -5,10 +5,12 @@
 //   sim --crg HOST:PORT [--role ...]               connected to a CRG scoreboard
 //   sim --shots DIR                                no window: every screen state as DIR/*.ppm
 //   sim --ctl [--crg ...] [--role ...]             no window: scripted on stdin (see runCtl)
+//   sim --board stopwatch ...                      the M5Stack StopWatch (466 x 466) instead of the
+//                                                  Waveshare board (240 x 240), with any of the above
 //
 // Keys: Space or C = crown (12 o'clock), U or Left = 10 o'clock button,
 // T or Right = 2 o'clock button. Hold a key as you would hold the button.
-// Mouse = touch. Window is zoomed x2.
+// Mouse = touch. Window is zoomed x2 (the StopWatch's x1).
 #include <SDL2/SDL.h>
 #include <netinet/in.h>
 #include <sys/select.h>
@@ -27,6 +29,8 @@
 #include "jamcore.h"
 #include "jtctl.h"
 #include "jtfonts.h"
+#include "jtfonts466.h"
+#include "scale.h"
 #include "jtui.h"
 #include "boxcore.h"
 #include "boxctl.h"
@@ -42,9 +46,12 @@
 #endif
 
 static bool useTtf = false;
+// --board: which board the simulator stands in for (display size, fonts, updates)
+static const upd::Board* simBoard = &upd::kWaveshareC6;
+static int simSize = 240;
 
 static jt::Fonts loadFonts() {
-    if (!useTtf) return jt::bitmapFonts();
+    if (!useTtf) return simSize > 240 ? jt::bitmapFonts466() : jt::bitmapFonts();
     // The TTF data is kept in memory: tiny_ttf on a file seeks for every glyph.
     // No kerning, as with the bitmap fonts the device will use.
     auto ttf = [](const char* weight, int size) {
@@ -57,7 +64,7 @@ static jt::Fonts loadFonts() {
         }
         data.reserve(16);
         data.emplace_back(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-        return (const lv_font_t*)lv_tiny_ttf_create_data_ex(data.back().data(), data.back().size(), size,
+        return (const lv_font_t*)lv_tiny_ttf_create_data_ex(data.back().data(), data.back().size(), ui::px(size),
                                                             LV_FONT_KERNING_NONE, 256);
     };
     jt::Fonts f;
@@ -120,7 +127,11 @@ struct SimPlatform : dev::Platform {
     void setBrightness(int p) override { lv_obj_set_style_opa(lv_screen_active(), (lv_opa_t)(p * 255 / 100), 0); }
     void sleep() override { std::printf("sleeping: press the crown to wake\n"); }
     void log(const std::string& l) override { std::printf("%s\n", l.c_str()); }
-    std::vector<std::string> info() override { return {"Battery: n/a (simulator)", "Firmware: simulator"}; }
+    std::vector<std::string> info() override {
+        return {"Battery: n/a (simulator)", std::string("Firmware: simulator, ") + simBoard->name};
+    }
+    const upd::Board& board() override { return *simBoard; }
+    int displaySize() override { return simSize; }
 
     // Settings in ~/.cache; --role and --crg override what is saved.
     std::string roleOverride, hostOverride;
@@ -247,8 +258,8 @@ static bool setupAtStart = false;
 static int runWindow(const std::string& host, int port, const std::string& role, bool roleSet) {
     lv_init();
     lv_tick_set_cb([]() -> uint32_t { return SDL_GetTicks(); });
-    lv_display_t* disp = lv_sdl_window_create(260, 260);
-    lv_sdl_window_set_zoom(disp, 2);
+    lv_display_t* disp = lv_sdl_window_create(simSize + 20, simSize + 20);
+    lv_sdl_window_set_zoom(disp, simSize > 240 ? 1 : 2);
     lv_sdl_mouse_create();
     SDL_AddEventWatch(keyWatch, nullptr);
     lv_obj_set_style_bg_color(lv_screen_active(), lv_color_hex(0x303030), 0);
@@ -282,10 +293,12 @@ static int runWindow(const std::string& host, int port, const std::string& role,
 }
 
 // ---------------- scripted (--ctl) ----------------
-// No window: a 240x240 display as on the board, real time, commands on stdin
-// (one per line, each answered with "OK" after it is done):
+// No window: a display as on the board (240 x 240, or 466 x 466 with --board
+// stopwatch), real time, commands on stdin (one per line, each answered with
+// "OK" after it is done):
 //   down crown|left|right    up crown|left|right    button down / up
-//   touch X Y                tap at X,Y (device pixels): 80 ms down, 60 ms up
+//   touch X Y                tap at X,Y in design pixels (240 x 240, as in docs/display.md;
+//                            scaled to the display): 80 ms down, 60 ms up
 //   text                     visible labels, one "TEXT ..." line, " | " between them
 //   shot FILE                screen as a PPM
 // Used by tools/game-test to run several devices against one scoreboard.
@@ -319,9 +332,9 @@ static int runCtl(const std::string& host, int port, const std::string& role, bo
     static uint32_t t0 = monoMs();
     lv_init();
     lv_tick_set_cb([]() -> uint32_t { return monoMs() - t0; });
-    static uint8_t buf[240 * 240 * 2];
-    lv_display_t* d = lv_display_create(240, 240);
-    lv_display_set_buffers(d, buf, nullptr, sizeof buf, LV_DISPLAY_RENDER_MODE_PARTIAL);
+    static std::vector<uint8_t> buf((size_t)simSize * simSize * 2);
+    lv_display_t* d = lv_display_create(simSize, simSize);
+    lv_display_set_buffers(d, buf.data(), nullptr, buf.size(), LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(d, [](lv_display_t* disp, const lv_area_t*, uint8_t*) { lv_display_flush_ready(disp); });
     lv_indev_t* in = lv_indev_create();
     lv_indev_set_type(in, LV_INDEV_TYPE_POINTER);
@@ -370,7 +383,7 @@ static int runCtl(const std::string& host, int port, const std::string& role, bo
                 lv_timer_handler();
                 std::printf("OK\n");
             } else if (cmd == "touch" && sscanf(line.c_str(), "%*s %d %d", &x, &y) == 2) {
-                ctlTouch = {true, x, y};
+                ctlTouch = {true, ui::px(x), ui::px(y)};
                 touchUntil = monoMs() + 80; // OK once released
             } else if (cmd == "text") {
                 dev.loop();
@@ -453,9 +466,9 @@ static std::string st(std::initializer_list<std::string> parts) {
 static int runShots(const std::string& dir) {
     lv_init();
     lv_tick_set_cb([]() -> uint32_t { return shotTick; });
-    static uint8_t buf[240 * 240 * 2];
-    lv_display_t* d = lv_display_create(240, 240);
-    lv_display_set_buffers(d, buf, nullptr, sizeof buf, LV_DISPLAY_RENDER_MODE_PARTIAL);
+    static std::vector<uint8_t> buf((size_t)simSize * simSize * 2);
+    lv_display_t* d = lv_display_create(simSize, simSize);
+    lv_display_set_buffers(d, buf.data(), nullptr, buf.size(), LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(d, [](lv_display_t* disp, const lv_area_t*, uint8_t*) { lv_display_flush_ready(disp); });
     jt::Fonts fonts = loadFonts();
     jt::Ui ui(lv_screen_active(), fonts);
@@ -774,6 +787,8 @@ static int runShots(const std::string& dir) {
                 void abort() override {}
             } slot;
             std::string firmwareVersion() override { return "0.1-dev"; }
+            const upd::Board& board() override { return *simBoard; }
+            int displaySize() override { return simSize; }
             upd::Slot& updateSlot() override { return slot; }
             std::unique_ptr<upd::Fetch> fetch(const std::string&) override { return nullptr; }
             bool usbPower() override { return false; }
@@ -829,11 +844,21 @@ int main(int argc, char** argv) {
             useTtf = true;
         } else if (!strcmp(argv[i], "--shots") && i + 1 < argc) {
             shots = argv[++i];
+        } else if (!strcmp(argv[i], "--board") && i + 1 < argc) {
+            std::string b = argv[++i];
+            if (b == "waveshare" || b == "waveshare-c6") simBoard = &upd::kWaveshareC6, simSize = 240;
+            else if (b == "stopwatch" || b == "m5-stopwatch") simBoard = &upd::kStopWatch, simSize = 466;
+            else {
+                std::fprintf(stderr, "board: waveshare or stopwatch\n");
+                return 2;
+            }
         } else {
-            std::fprintf(stderr, "usage: sim [--role jt|blockers1|blockers2|jammers] [--crg HOST:PORT] [--setup] [--shots DIR] [--ctl] [--ttf]\n");
+            std::fprintf(stderr, "usage: sim [--board waveshare|stopwatch] [--role jt|blockers1|blockers2|jammers] "
+                                 "[--crg HOST:PORT] [--setup] [--shots DIR] [--ctl] [--ttf]\n");
             return 2;
         }
     }
+    ui::gScreen = simSize; // the shots draw screens without a Device
     if (!shots.empty()) return runShots(shots);
     if (ctl) return runCtl(host, port, role, roleSet);
     return runWindow(host, port, role, roleSet);

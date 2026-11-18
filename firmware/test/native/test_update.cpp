@@ -63,14 +63,19 @@ static void releaseAndVersions() {
     CHECK(resolve("http://h/latest.json", "https://o/a.bin") == "https://o/a.bin");
 }
 
-// A fake firmware image: ESP32-C6 header, then bytes.
-static std::string image(size_t n, uint16_t chip = 13) {
+// A fake firmware image: header for the chip, bytes, and the board marker
+// near the middle ("" = none, as in 0.1.0).
+static std::string image(size_t n, uint16_t chip = 13, const std::string& board = "waveshare-c6") {
     std::string s(n, '\0');
     s[0] = (char)0xE9;
     s[1] = 3;
     s[12] = (char)(chip & 0xff);
     s[13] = (char)(chip >> 8);
     for (size_t i = 16; i < n; i++) s[i] = (char)(i * 7);
+    if (!board.empty()) {
+        std::string m = "CLOCK-BOARD=" + board + ";";
+        if (n > 64 + m.size()) s.replace(n / 2, m.size(), m);
+    }
     return s;
 }
 
@@ -98,7 +103,7 @@ struct FakeSlot : Slot {
 
 static void writer() {
     FakeSlot s;
-    Writer w(s);
+    Writer w(s, kWaveshareC6);
     std::string img = image(5000);
     CHECK(w.begin(img.size(), sha(img)) == "");
     // pieces smaller than the header first
@@ -126,10 +131,71 @@ static void writer() {
     CHECK(s.data.empty() && s.aborted);
     std::string esp32 = image(200, 0); // plain ESP32
     CHECK(w.begin(esp32.size(), "") == "");
-    CHECK(w.write((const uint8_t*)esp32.data(), esp32.size()) == "This firmware is not for the ESP32-C6");
+    CHECK(w.write((const uint8_t*)esp32.data(), esp32.size()) ==
+          "This firmware is for another chip (ESP32)");
     // slot refuses
     s.failBegin = "Update slot too small";
     CHECK(w.begin(100, "") == "Update slot too small" && !w.active());
+}
+
+static void writeAll(Writer& w, const std::string& img, size_t piece) {
+    for (size_t i = 0; i < img.size(); i += piece)
+        w.write((const uint8_t*)img.data() + i, img.size() - i < piece ? img.size() - i : piece);
+}
+
+static void boards() {
+    CHECK(findBoard("waveshare-c6") == &kWaveshareC6 && findBoard("m5-stopwatch") == &kStopWatch);
+    CHECK(findBoard("c6") == nullptr);
+    // release address: the site plus the board's folder, or a .json as it stands
+    CHECK(releaseUrl("https://clock.quagga.rocks/", kStopWatch) == "https://clock.quagga.rocks/m5-stopwatch/latest.json");
+    CHECK(releaseUrl("https://clock.quagga.rocks", kWaveshareC6) == "https://clock.quagga.rocks/waveshare-c6/latest.json");
+    CHECK(releaseUrl("http://10.0.0.5:8080/rel/latest.json", kStopWatch) == "http://10.0.0.5:8080/rel/latest.json");
+    CHECK(releaseUrl("http://h/x.json?t=1", kStopWatch) == "http://h/x.json?t=1");
+    CHECK(releaseUrl("", kStopWatch) == "");
+
+    // marker found across piece boundaries
+    FakeSlot s;
+    Writer sw(s, kStopWatch);
+    std::string img = image(5000, 9, "m5-stopwatch");
+    for (size_t piece : {1, 3, 7, 1460}) {
+        CHECK(sw.begin(img.size(), sha(img)) == "");
+        writeAll(sw, img, piece);
+        CHECK(sw.finish() == "" && s.finished);
+    }
+    // the same chip with another board's marker
+    std::string other = image(5000, 9, "waveshare-c6");
+    CHECK(sw.begin(other.size(), "") == "");
+    writeAll(sw, other, 1000);
+    CHECK(sw.finish() == "This firmware is for the Waveshare ESP32-C6 1.28" &&
+          s.aborted);
+    // C6 firmware on the StopWatch: refused at the header already
+    std::string c6 = image(5000, 13, "waveshare-c6");
+    CHECK(sw.begin(c6.size(), "") == "");
+    CHECK(sw.write((const uint8_t*)c6.data(), c6.size()) ==
+          "This firmware is for the Waveshare ESP32-C6 1.28");
+    // no marker: refused on the StopWatch, taken on the Waveshare (0.1.0)
+    std::string bare = image(5000, 9, "");
+    CHECK(sw.begin(bare.size(), "") == "");
+    writeAll(sw, bare, 1000);
+    CHECK(sw.finish() == "This is not CLOCK firmware for the M5Stack StopWatch");
+    Writer cw(s, kWaveshareC6);
+    std::string old = image(5000, 13, "");
+    CHECK(cw.begin(old.size(), "") == "");
+    writeAll(cw, old, 1000);
+    CHECK(cw.finish() == "");
+    // the prefix alone (as in the scanner's own code), or a broken marker, is no marker
+    std::string fake = image(5000, 9, "");
+    fake.replace(100, 13, std::string("CLOCK-BOARD=\0", 13));
+    fake.replace(200, 25, "CLOCK-CLOCK-BOARD=m5-stop");
+    fake.replace(300, 26, "CLOCK-BOARD=m5-stopwatch;;");
+    CHECK(sw.begin(fake.size(), "") == "");
+    writeAll(sw, fake, 50);
+    CHECK(sw.finish() == ""); // the one at 300 counts; 200 is cut off by the next bytes
+    std::string broken = image(5000, 9, "");
+    broken.replace(100, 25, "CLOCK-BOARD=m5-stopwatch!");
+    CHECK(sw.begin(broken.size(), "") == "");
+    writeAll(sw, broken, 50);
+    CHECK(sw.finish() == "This is not CLOCK firmware for the M5Stack StopWatch");
 }
 
 static void rules() {
@@ -186,6 +252,7 @@ struct FakeHost : Host {
     Slot& slot() override { return s; }
     Conditions conditions() override { return c; }
     std::string version() override { return ver; }
+    const Board& board() override { return kWaveshareC6; }
 };
 
 static std::string latest(const std::string& v, const std::string& img) {
@@ -284,6 +351,7 @@ int main() {
     sha256();
     releaseAndVersions();
     writer();
+    boards();
     rules();
     flow();
     if (failures) {

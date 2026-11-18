@@ -326,6 +326,12 @@ class Proxy:
 
 # ---------------- simulated CLOCKs ----------------
 
+# Which board the simulated CLOCKs stand in for: CLOCK_SIM_BOARD=stopwatch
+# runs every test on the M5Stack StopWatch's 466 x 466 screens (touch
+# positions stay in design pixels, sim --ctl scales them).
+BOARD = os.environ.get("CLOCK_SIM_BOARD", "")
+
+
 class Clock:
     def __init__(self, sim, role, name, port, out, env=None, home=None):
         self.sim, self.role, self.name, self.port, self.env = sim, role, name, port, env or {}
@@ -337,6 +343,8 @@ class Clock:
     def start(self):
         env = dict(os.environ, HOME=self.home, **self.env)
         args = [self.sim, "--ctl", "--role", self.role] + (["--crg", f"localhost:{self.port}"] if self.port else [])
+        if BOARD:
+            args += ["--board", BOARD]
         self.p = subprocess.Popen(args,
                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, env=env, bufsize=1)
         line = self.p.stdout.readline()

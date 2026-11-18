@@ -154,7 +154,9 @@ static void applyValue(Settings& s, const std::string& k, const std::string& v) 
     } else if (k == "motor") s.motorFitted = v == "1";
     else if (k == "brightness") num(10, 100, s.brightness);
     else if (k == "sleepMinutes") num(0, 120, s.sleepMinutes);
-    else if (k == "updateUrl") s.updateUrl = v;
+    // 0.1.0's default named the Waveshare's release file; now the site, so
+    // each board finds its own firmware
+    else if (k == "updateUrl") s.updateUrl = v == "https://clock.quagga.rocks/latest.json" ? Settings().updateUrl : v;
     else if (k == "jam") dur(10000, 600000, s.jamMs);
     else if (k == "lineup") dur(5000, 300000, s.lineupMs);
     else if (k == "timeout") dur(10000, 600000, s.timeoutMs);
@@ -369,8 +371,9 @@ std::string page(const Settings& s, const std::string& message, const std::strin
          std::to_string(s.sleepMinutes) + "\"></label>";
     h += std::string("<label><input type=\"checkbox\" name=\"motor\"") + (s.motorFitted ? " checked" : "") +
          "> Vibration motor fitted</label>";
-    h += "<label>Release address (for Update in the device menu)<input type=\"text\" name=\"updateUrl\" value=\"" +
-         htmlEscape(s.updateUrl) + "\" placeholder=\"https://clock.quagga.rocks/latest.json\"></label>";
+    h += "<label>Release address (for Update in the device menu: the install site, or a latest.json)"
+         "<input type=\"text\" name=\"updateUrl\" value=\"" +
+         htmlEscape(s.updateUrl) + "\" placeholder=\"https://clock.quagga.rocks/\"></label>";
     h += "<button type=\"submit\">Save</button></form>";
     if (!firmware.empty()) {
         // Upload without internet: the raw file as the body (no multipart),

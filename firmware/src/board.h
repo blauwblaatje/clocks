@@ -1,27 +1,43 @@
-// Board drivers: GC9A01 display (through Arduino_GFX), CST816S touch,
-// backlight and battery. Compiles; not run on the board yet.
+// What differs between the boards CLOCK runs on. One implementation per
+// board, chosen by the PlatformIO environment (build_src_filter):
+//   env c6         board_waveshare_c6.cpp   Waveshare ESP32-C6-Touch-LCD-1.28, 240 x 240
+//   env stopwatch  board_m5_stopwatch.cpp   M5Stack StopWatch (ESP32-S3), 466 x 466
+// main.cpp and everything in lib/ are the same for every board.
 #pragma once
 #include <stdint.h>
+#include <string>
+#include <vector>
 
 #include "lvgl.h"
+#include "update.h"
 
 namespace board {
 
-// The board sits in the case a quarter turn round (USB at 3 o'clock seen from
-// the front, the board's own "down" is its USB side). Picture and touch are
-// turned by the same amount. If the picture comes out upside down on the
-// first run, change kRotation from 1 to 3; touch follows automatically.
-constexpr uint8_t kRotation = 1;
+extern const upd::Board& kBoard; // which firmware this is: updates fetch and accept only this board's
+extern const char kMarker[];     // "CLOCK-BOARD=<id>;" in the image (lib/update MarkerScan)
+extern const int kSize;          // round display, pixels across
 
-void begin();                   // display, touch, backlight
-lv_display_t* createDisplay();  // LVGL display with partial buffers and flush
-lv_indev_t* createTouch();      // LVGL pointer input from the CST816S
+void begin();                    // power, display, touch, buttons
+lv_display_t* createDisplay();   // LVGL display with partial buffers and flush
+lv_indev_t* createTouch();       // LVGL pointer input
 void setBrightness(int percent); // 0..100
-void displayOff();              // backlight off, panel to sleep (before deep sleep)
-// Battery voltage in mV and an estimated charge; false if the reading is implausible.
-bool battery(int& millivolts, int& percent);
+void displayOff();               // before sleep
 
-// Touch coordinates from the panel's own frame to the screen's (rotation).
-void rotateTouch(uint8_t rotation, int nx, int ny, int& lx, int& ly);
+// The three buttons as the device sees them, seen from the front: crown
+// (12 o'clock), left (10) and right (2). Bit 0 crown, bit 1 left, bit 2 right.
+enum : uint8_t { kCrown = 1, kLeft = 2, kRight = 4 };
+uint8_t buttons();
+
+// Battery: false while unknown or implausible.
+bool battery(int& millivolts, int& percent, bool& charging);
+// Powered over USB, for the update battery rule.
+bool usbPower();
+// Power off / deep sleep; does not return.
+[[noreturn]] void sleep();
+// Board lines for the Info screen (battery and the like).
+std::vector<std::string> info();
+
+// Shared by the boards: single-cell LiPo, rough voltage to charge.
+int lipoPercent(int millivolts);
 
 } // namespace board

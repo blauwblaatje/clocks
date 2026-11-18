@@ -9,7 +9,7 @@ SDL_CFLAGS := $(shell pkg-config --cflags sdl2)
 SDL_LIBS := $(shell pkg-config --libs sdl2)
 INC := -I. -I$(LVGL) -I$(FW)/jamcore -I$(FW)/crgclient -I$(FW)/jtctl -I$(FW)/jtui -I$(FW)/boxcore -I$(FW)/boxctl \
        -I$(FW)/boxui -I$(FW)/devmenu -I$(FW)/devmenuui -I$(FW)/wsposix -I$(FW)/device \
-       -I$(FW)/settings -I$(FW)/httpmini -I$(FW)/update $(SDL_CFLAGS)
+       -I$(FW)/settings -I$(FW)/httpmini -I$(FW)/update -I$(FW)/jtfonts466 $(SDL_CFLAGS)
 DEFS := -DLV_CONF_INCLUDE_SIMPLE -DSIM_FONT_DIR='"$(abspath deps/montserrat)"'
 CFLAGS := -O2 -g $(INC) $(DEFS)
 CXXFLAGS := -std=c++17 -O1 -g -Wall $(INC) $(DEFS)
@@ -22,7 +22,7 @@ APP_SRC := main.cpp $(FW)/wsposix/wsposix.cpp $(FW)/device/device.cpp $(FW)/jamc
            $(FW)/settings/settings.cpp $(FW)/httpmini/httpmini.cpp \
            $(FW)/update/update.cpp $(FW)/update/sha256.cpp $(FW)/update/httpget.cpp
 APP_OBJ := $(patsubst %.cpp,$(BUILD)/app/%.o,$(notdir $(APP_SRC)))
-FONT_SRC := $(wildcard $(FW)/jtui/fonts/*.c)
+FONT_SRC := $(wildcard $(FW)/jtui/fonts/*.c) $(wildcard $(FW)/jtfonts466/*.c)
 FONT_OBJ := $(patsubst %.c,$(BUILD)/fonts/%.o,$(notdir $(FONT_SRC)))
 vpath %.cpp . $(FW)/jamcore $(FW)/crgclient $(FW)/jtctl $(FW)/jtui $(FW)/boxcore $(FW)/boxctl $(FW)/boxui $(FW)/devmenu $(FW)/devmenuui $(FW)/wsposix $(FW)/device $(FW)/settings $(FW)/httpmini $(FW)/update
 
@@ -30,6 +30,10 @@ $(BUILD)/sim: $(APP_OBJ) $(FONT_OBJ) $(BUILD)/liblvgl.a
 	$(CXX) -o $@ $(APP_OBJ) $(FONT_OBJ) $(BUILD)/liblvgl.a $(SDL_LIBS) -lm
 
 $(BUILD)/fonts/%.o: $(FW)/jtui/fonts/%.c lv_conf.h
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -DLV_LVGL_H_INCLUDE_SIMPLE -c $< -o $@
+
+$(BUILD)/fonts/%.o: $(FW)/jtfonts466/%.c lv_conf.h
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -DLV_LVGL_H_INCLUDE_SIMPLE -c $< -o $@
 

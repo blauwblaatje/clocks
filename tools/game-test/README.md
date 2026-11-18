@@ -13,7 +13,13 @@ websocket-client, Pillow for the screenshot sheets (else PPM).
 
     python3 tools/game-test/game4.py sim/build/sim CHECKOUT OUT/classes RESULTS [PORT]   # about 3 min
     python3 tools/game-test/drops.py sim/build/sim CHECKOUT OUT/classes RESULTS [PORT]   # about 3 min
-    python3 tools/game-test/update.py sim/build/sim firmware/.pio/build/c6/firmware.bin RESULTS   # about 1 min
+    python3 tools/game-test/update.py sim/build/sim firmware/.pio/build/c6/firmware.bin RESULTS \
+        [firmware/.pio/build/stopwatch/firmware.bin]   # about 1 min; the other board's build adds refusal checks
+
+`CLOCK_SIM_BOARD=stopwatch` in front of any of them runs the CLOCKs as M5Stack
+StopWatches (466 x 466 screens; update.py then takes the stopwatch build
+first and the c6 build as the other board). Touch positions stay in design
+pixels (240 x 240); `sim --ctl` scales them.
 
 Run one at a time: two CRGs from one checkout share its autosave folder.
 RESULTS gets a screenshot sheet per step (`NN-step.png`), each device's log

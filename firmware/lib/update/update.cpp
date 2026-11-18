@@ -68,12 +68,99 @@ std::string resolve(const std::string& base, const std::string& ref) {
     return path.substr(0, slash + 1) + ref;
 }
 
-std::string checkImage(const uint8_t* p, size_t n) {
+// ---------- boards ----------
+
+const Board kWaveshareC6 = {"waveshare-c6", "Waveshare ESP32-C6 1.28", 13, true};
+const Board kStopWatch = {"m5-stopwatch", "M5Stack StopWatch", 9, false};
+static const Board* const kBoards[] = {&kWaveshareC6, &kStopWatch};
+
+const Board* findBoard(const std::string& id) {
+    for (const Board* b : kBoards)
+        if (id == b->id) return b;
+    return nullptr;
+}
+
+std::string releaseUrl(const std::string& setting, const Board& b) {
+    if (setting.empty()) return "";
+    std::string path = setting.substr(0, setting.find_first_of("?#"));
+    if (path.size() >= 5 && path.compare(path.size() - 5, 5, ".json") == 0) return setting;
+    std::string u = path;
+    if (u.back() != '/') u += '/';
+    return u + b.id + "/latest.json";
+}
+
+static std::string chipName(uint16_t chip) {
+    switch (chip) {
+    case 0: return "ESP32";
+    case 9: return "ESP32-S3";
+    case 13: return "ESP32-C6";
+    }
+    return "id " + std::to_string(chip);
+}
+
+std::string checkImage(const uint8_t* p, size_t n, const Board& b) {
     if (n < kImageHeader) return "The file is too short to be firmware";
     if (p[0] != 0xE9) return "This is not a firmware file (use firmware.bin)";
     uint16_t chip = (uint16_t)(p[12] | p[13] << 8);
-    if (chip != 13) return "This firmware is not for the ESP32-C6";
+    if (chip != b.chip) {
+        for (const Board* o : kBoards)
+            if (o->chip == chip) return std::string("This firmware is for the ") + o->name;
+        return std::string("This firmware is for another chip (") + chipName(chip) + ")";
+    }
     return "";
+}
+
+void MarkerScan::reset() {
+    matched_ = 0;
+    inId_ = false;
+    id_.clear();
+    found_.clear();
+}
+
+// The prefix in the scanner's own code is followed by a NUL, never by an id
+// and ';', so it does not count as a marker.
+void MarkerScan::feed(const uint8_t* p, size_t n) {
+    static const char kPrefix[] = CLOCK_BOARD_MARKER_PREFIX;
+    static const size_t kLen = sizeof kPrefix - 1;
+    for (size_t i = 0; i < n; i++) {
+        char c = (char)p[i];
+        if (inId_) {
+            if (c == ';' && !id_.empty()) {
+                bool seen = false;
+                for (auto& f : found_) seen |= f == id_;
+                if (!seen && found_.size() < 4) found_.push_back(id_);
+                inId_ = false;
+                id_.clear();
+                continue;
+            }
+            if (((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') && id_.size() < 32) {
+                id_ += c;
+                continue;
+            }
+            inId_ = false;
+            id_.clear();
+            matched_ = 0; // fall through: c may start a new prefix
+        }
+        if (c == kPrefix[matched_]) {
+            if (++matched_ == kLen) {
+                inId_ = true;
+                matched_ = 0;
+            }
+        } else {
+            matched_ = c == kPrefix[0] ? 1 : 0;
+        }
+    }
+}
+
+std::string MarkerScan::verdict(const Board& b) const {
+    for (auto& f : found_)
+        if (f == b.id) return "";
+    if (!found_.empty()) {
+        const Board* o = findBoard(found_[0]);
+        return std::string("This firmware is for the ") + (o ? o->name : found_[0].c_str());
+    }
+    if (b.legacy) return ""; // built before the marker existed
+    return std::string("This is not CLOCK firmware for the ") + b.name;
 }
 
 // ---------- writer ----------
@@ -84,6 +171,7 @@ std::string Writer::begin(size_t size, const std::string& sha256hex) {
     std::string e = slot_.begin(size);
     if (!e.empty()) return e;
     sha_.reset();
+    marks_.reset();
     want_ = sha256hex;
     size_ = size;
     written_ = 0;
@@ -103,7 +191,7 @@ std::string Writer::write(const uint8_t* data, size_t len) {
         keep = kImageHeader - written_ < len ? kImageHeader - written_ : len;
         memcpy(head_ + written_, data, keep);
         if (written_ + keep == kImageHeader) {
-            std::string e = checkImage(head_, kImageHeader);
+            std::string e = checkImage(head_, kImageHeader, board_);
             if (!e.empty()) {
                 abort();
                 return e;
@@ -115,6 +203,7 @@ std::string Writer::write(const uint8_t* data, size_t len) {
         }
     }
     sha_.update(data, len);
+    marks_.feed(data, len);
     written_ += len;
     if (len > keep && !slot_.write(data + keep, len - keep)) {
         abort();
@@ -132,6 +221,11 @@ std::string Writer::finish() {
     if (!want_.empty() && sha_.hex() != want_) {
         abort();
         return "Checksum wrong: the download is damaged";
+    }
+    std::string m = marks_.verdict(board_);
+    if (!m.empty()) {
+        abort();
+        return m;
     }
     active_ = false;
     std::string e = slot_.finish();

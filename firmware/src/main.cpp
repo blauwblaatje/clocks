@@ -1,20 +1,22 @@
-// Firmware entry: the shared device (lib/device) on the ESP32-C6 board.
-// Compiles for the chip; not run on hardware yet. Board drivers: board.cpp.
+// Firmware entry: the shared device (lib/device) on a board. The same for
+// every board; what differs is in board_<name>.cpp (board.h). Compiles for
+// both chips; not run on hardware yet.
 #include <Arduino.h>
 #include <Preferences.h>
 #include <WiFi.h>
-#include <driver/usb_serial_jtag.h>
 #include <esp_crt_bundle.h>
 #include <esp_http_client.h>
 #include <esp_ota_ops.h>
-#include <esp_sleep.h>
 
+#include "board.h"
 #include "device.h"
 #include "httpget.h"
-#include "jtfonts.h"
 #include "lvgl.h"
-#include "board.h"
-#include "pins.h"
+#ifdef CLOCK_DISPLAY_466
+#include "jtfonts466.h"
+#else
+#include "jtfonts.h"
+#endif
 
 #ifndef FW_VERSION
 #define FW_VERSION "0.1-dev"
@@ -157,11 +159,7 @@ class BoardPlatform : public dev::Platform {
     void setBrightness(int pct) override { board::setBrightness(pct); }
     void sleep() override {
         markValid("going to sleep"); // a reset while pending would roll back
-        // Wake on the crown (IO1 is a low-power GPIO, so ext1 can wake on it).
-        // TODO: require the 1 s hold after waking (check on wake, else sleep again).
-        board::displayOff();
-        esp_sleep_enable_ext1_wakeup_io(1ULL << PIN_BTN_CROWN, ESP_EXT1_WAKEUP_ANY_LOW);
-        esp_deep_sleep_start();
+        board::sleep();
     }
     void log(const std::string& line) override { Serial.println(line.c_str()); }
     // ---- settings in NVS ----
@@ -209,8 +207,7 @@ class BoardPlatform : public dev::Platform {
     }
     bool battery(int& pct, bool& charging) override {
         int mv = 0;
-        charging = false; // the board has no charge-status pin (only the CHG LED)
-        return board::battery(mv, pct);
+        return board::battery(mv, pct, charging);
     }
     // Call from loop(): move on to the next saved network after a while.
     void wifiLoop(uint32_t now) {
@@ -255,6 +252,8 @@ class BoardPlatform : public dev::Platform {
 
     // ---- updates ----
     std::string firmwareVersion() override { return FW_VERSION; }
+    const upd::Board& board() override { return board::kBoard; }
+    int displaySize() override { return board::kSize; }
     upd::Slot& updateSlot() override { return slot_; }
     std::unique_ptr<upd::Fetch> fetch(const std::string& url) override {
         if (WiFi.status() != WL_CONNECTED) return nullptr;
@@ -262,21 +261,20 @@ class BoardPlatform : public dev::Platform {
             return std::unique_ptr<upd::Fetch>(new upd::HttpGet(url, [] { return (uint32_t)millis(); }));
         return std::unique_ptr<upd::Fetch>(new EspFetch(url));
     }
-    // A computer on the USB port (the board has no pin for a plain charger).
-    bool usbPower() override { return usb_serial_jtag_is_connected(); }
+    bool usbPower() override { return board::usbPower(); }
     void restart() override {
         delay(100);
         esp_restart();
     }
 
     std::vector<std::string> info() override {
-        std::vector<std::string> l;
-        l.push_back("Battery: not read yet");
+        std::vector<std::string> l = board::info();
         if (WiFi.status() == WL_CONNECTED)
             l.push_back(std::string("Wi-Fi: ") + WiFi.SSID().c_str() + ", " + std::to_string(WiFi.RSSI()) + " dBm");
         else l.push_back("Wi-Fi: not connected");
         const esp_partition_t* run = esp_ota_get_running_partition();
         l.push_back(std::string("Firmware: " FW_VERSION) + (run ? std::string(" (") + run->label + ")" : ""));
+        l.push_back(std::string("Board: ") + board::kBoard.name);
         if (esp_ota_get_last_invalid_partition()) l.push_back("Last update failed: rolled back");
         return l;
     }
@@ -292,16 +290,17 @@ class BoardPlatform : public dev::Platform {
 
 
 struct Btn {
-    uint8_t pin;
+    uint8_t bit;
     dev::Phys id;
     bool down;
     uint32_t lastEdge;
 };
-// Crown at 12, timeout/pause at 2 (right), undo at 10 (left), seen from the front.
+// Crown at 12, undo at 10 (left), timeout/pause at 2 (right), seen from the
+// front; which physical button is which is up to the board (board::buttons).
 static Btn btns[] = {
-    {PIN_BTN_CROWN, dev::Phys::Crown, false, 0},
-    {PIN_BTN_TIMEOUT, dev::Phys::Right, false, 0},
-    {PIN_BTN_UNDO, dev::Phys::Left, false, 0},
+    {board::kCrown, dev::Phys::Crown, false, 0},
+    {board::kRight, dev::Phys::Right, false, 0},
+    {board::kLeft, dev::Phys::Left, false, 0},
 };
 static const uint32_t kLockoutMs = 20;
 
@@ -310,7 +309,7 @@ static dev::Device* device = nullptr;
 
 void setup() {
     Serial.begin(115200);
-    for (auto& b : btns) pinMode(b.pin, INPUT_PULLUP);
+    Serial.printf("CLOCK %s, %s\n", FW_VERSION, board::kMarker); // also keeps the marker in the image
 
     board::begin();
     lv_init();
@@ -321,7 +320,11 @@ void setup() {
 
     WiFi.mode(WIFI_STA);
     WiFi.setSleep(false); // radio power saving off while in use (HANDOVER section 8)
+#ifdef CLOCK_DISPLAY_466
+    device = new dev::Device(platform, lv_screen_active(), jt::bitmapFonts466());
+#else
     device = new dev::Device(platform, lv_screen_active(), jt::bitmapFonts());
+#endif
     platform.networksChanged(device->settings());
     // No Wi-Fi saved yet: open setup at once (HANDOVER section 8).
     if (device->settings().networks.empty()) device->startSetup();
@@ -330,8 +333,9 @@ void setup() {
 void loop() {
     uint32_t now = millis();
     // Act on the press edge; ignore further edges on that pin for kLockoutMs.
+    uint8_t held = board::buttons();
     for (auto& b : btns) {
-        bool down = digitalRead(b.pin) == LOW;
+        bool down = (held & b.bit) != 0;
         if (down != b.down && now - b.lastEdge >= kLockoutMs) {
             b.down = down;
             b.lastEdge = now;

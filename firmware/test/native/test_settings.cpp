@@ -85,7 +85,7 @@ static void pageAndQr() {
     CHECK(urlDecode("a+b%20c%3D") == "a b c=");
 
     // release address and the firmware upload
-    CHECK(has(p, "name=\"updateUrl\" value=\"https://clock.quagga.rocks/latest.json\""));
+    CHECK(has(p, "name=\"updateUrl\" value=\"https://clock.quagga.rocks/\""));
     CHECK(!has(p, "/update")); // no upload without a firmware version
     std::string f = page(s, "", "0.3.0");
     CHECK(has(f, "Running: 0.3.0") && has(f, "x.open('POST','/update')"));
@@ -93,6 +93,9 @@ static void pageAndQr() {
     u.updateUrl = "http://192.168.1.5:8080/latest.json";
     Settings back = parse(serialize(u));
     CHECK(back.updateUrl == u.updateUrl);
+    // 0.1.0's default (the Waveshare's latest.json) becomes the site
+    Settings old = parse("updateUrl=https://clock.quagga.rocks/latest.json\n");
+    CHECK(old.updateUrl == "https://clock.quagga.rocks/");
     std::string base = "role=jt&brightness=100&jam=2%3A00&lineup=0%3A30&timeout=1%3A00&period=30%3A00&periods=2"
                        "&periodAfterTimeout=nextjam&undoLevels=1";
     Settings o;
