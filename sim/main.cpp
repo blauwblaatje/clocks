@@ -301,9 +301,13 @@ static int runWindow(const std::string& host, int port, const std::string& role,
 //                            scaled to the display): 80 ms down, 60 ms up
 //   text                     visible labels, one "TEXT ..." line, " | " between them
 //   shot FILE                screen as a PPM
+//   flushed                  pixels sent to the panel since the last "flushed"
+//   fb FILE                  what the panel shows (partial redraws as on the board) as a PPM
 // Used by tools/game-test to run several devices against one scoreboard.
 
 static void writePpm(lv_obj_t* obj, const std::string& path);
+static std::vector<uint16_t> ctlPanel; // --ctl: the panel's memory, RGB565
+static uint64_t ctlFlushed = 0;        // --ctl: pixels sent to the panel ("flushed" reads and resets)
 
 static uint32_t monoMs() {
     timespec ts;
@@ -332,10 +336,32 @@ static int runCtl(const std::string& host, int port, const std::string& role, bo
     static uint32_t t0 = monoMs();
     lv_init();
     lv_tick_set_cb([]() -> uint32_t { return monoMs() - t0; });
-    static std::vector<uint8_t> buf((size_t)simSize * simSize * 2);
+    // Drawn as on the board: 40-line partial buffers, flushed into a panel
+    // memory that keeps what is not redrawn ("fb FILE" saves it), and on the
+    // StopWatch areas rounded to even rows and columns (board_m5_stopwatch.cpp).
+    static std::vector<uint8_t> buf1((size_t)simSize * 40 * 2), buf2((size_t)simSize * 40 * 2);
+    ctlPanel.assign((size_t)simSize * simSize, 0);
     lv_display_t* d = lv_display_create(simSize, simSize);
-    lv_display_set_buffers(d, buf.data(), nullptr, buf.size(), LV_DISPLAY_RENDER_MODE_PARTIAL);
-    lv_display_set_flush_cb(d, [](lv_display_t* disp, const lv_area_t*, uint8_t*) { lv_display_flush_ready(disp); });
+    lv_display_set_buffers(d, buf1.data(), buf2.data(), buf1.size(), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_set_flush_cb(d, [](lv_display_t* disp, const lv_area_t* a, uint8_t* px) {
+        const uint16_t* p = (const uint16_t*)px;
+        ctlFlushed += (uint64_t)(a->x2 - a->x1 + 1) * (a->y2 - a->y1 + 1);
+        if (getenv("CLOCK_SIM_FLUSHLOG")) std::fprintf(stderr, "flush %d,%d %dx%d\n", (int)a->x1, (int)a->y1, (int)(a->x2 - a->x1 + 1), (int)(a->y2 - a->y1 + 1));
+        for (int y = a->y1; y <= a->y2; y++)
+            for (int x = a->x1; x <= a->x2; x++) ctlPanel[(size_t)y * simSize + x] = *p++;
+        lv_display_flush_ready(disp);
+    });
+    if (simSize == 466)
+        lv_display_add_event_cb(
+            d,
+            [](lv_event_t* e) {
+                lv_area_t* a = (lv_area_t*)lv_event_get_param(e);
+                a->x1 &= ~1;
+                a->y1 &= ~1;
+                a->x2 |= 1;
+                a->y2 |= 1;
+            },
+            LV_EVENT_INVALIDATE_AREA, nullptr);
     lv_indev_t* in = lv_indev_create();
     lv_indev_set_type(in, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(in, [](lv_indev_t*, lv_indev_data_t* data) {
@@ -394,6 +420,22 @@ static int runCtl(const std::string& host, int port, const std::string& role, bo
                 labels(lv_layer_top(), top);
                 if (!top.empty()) out += " || " + top;
                 std::printf("TEXT %s\nOK\n", out.c_str());
+            } else if (cmd == "flushed") {
+                std::printf("FLUSHED %llu\nOK\n", (unsigned long long)ctlFlushed);
+                ctlFlushed = 0;
+            } else if (cmd == "fb" && sscanf(line.c_str(), "%*s %255s", c) == 1) {
+                lv_timer_handler();
+                FILE* f = std::fopen(c, "wb");
+                if (f) {
+                    std::fprintf(f, "P6\n%d %d\n255\n", simSize, simSize);
+                    for (uint16_t v : ctlPanel) {
+                        unsigned char rgb[3] = {(unsigned char)((v >> 11) << 3), (unsigned char)(((v >> 5) & 63) << 2),
+                                                (unsigned char)((v & 31) << 3)};
+                        std::fwrite(rgb, 1, 3, f);
+                    }
+                    std::fclose(f);
+                }
+                std::printf("OK\n");
             } else if (cmd == "shot" && sscanf(line.c_str(), "%*s %255s", c) == 1) {
                 lv_timer_handler();
                 writePpm(lv_screen_active(), c);

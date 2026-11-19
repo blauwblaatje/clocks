@@ -1,6 +1,7 @@
 // Host test for the jam timer controller (buttons -> commands, view).
 // Build (one line): g++ -std=c++17 -Wall -Ilib/jamcore -Ilib/crgclient -Ilib/jtctl test/native/test_jtctl.cpp
 //   lib/jamcore/jamcore.cpp lib/crgclient/*.cpp lib/jtctl/jtctl.cpp -o /tmp/tt && /tmp/tt
+#include "buttons.h"
 #include "jtctl.h"
 #include <cstdio>
 
@@ -199,6 +200,8 @@ static void intermissionHold() {
               5000);
     View v = k.view(5000);
     CHECK(v.state == "INTERMISSION" && v.hint == "Hold: Extend period 1" && v.clock == "10:00");
+    // the menu opens in intermission; role changes, updates and sleep wait
+    CHECK(k.canOpenMenu() && !k.idle());
     press(k, Btn::Crown, 6000, 600); // too short
     CHECK(c.outgoing().empty());
     k.button(Btn::Crown, true, 7000);
@@ -311,8 +314,21 @@ static void lostAndTakeOver() {
     CHECK(k.view(59200).screen == Screen::Main && !k.view(59200).scoreboardBack); // no scoreboard: no prompt
 }
 
+// A board with coloured buttons (StopWatch) names them by colour.
+static void colourNames() {
+    btn::gNames = {"Yellow", "Red", "Blue"};
+    jamcore::JamTimer jt;
+    Controller k(jt, nullptr, Mode::Standalone);
+    CHECK(k.view(0).hint == "Yellow: Jam \xc2\xb7 Red: Lineup");
+    press(k, Btn::Crown, 1000);
+    CHECK(k.view(2000).hint.rfind("Yellow: ", 0) == 0);
+    btn::gNames = {};
+    CHECK(k.view(2000).hint.rfind("Crown: ", 0) == 0);
+}
+
 int main() {
     standalone();
+    colourNames();
     readyLineup();
     ejtWarning();
     undoAndMenuHold();

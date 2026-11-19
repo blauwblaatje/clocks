@@ -1,6 +1,7 @@
 // Host test for the box timer roles (buttons/touch -> commands, view).
 // Build (one line): g++ -std=c++17 -Wall -Ilib/boxcore -Ilib/crgclient -Ilib/boxctl test/native/test_boxctl.cpp
 //   lib/boxcore/boxcore.cpp lib/crgclient/*.cpp lib/boxctl/boxctl.cpp -o /tmp/tx && /tmp/tx
+#include "buttons.h"
 #include "boxctl.h"
 #include <cstdio>
 
@@ -329,8 +330,24 @@ static void releaseButton() {
     CHECK(s.view(2000).paused);
 }
 
+// A board with coloured buttons (StopWatch) names them by colour.
+static void colourNames() {
+    btn::gNames = {"Yellow", "Red", "Blue"};
+    boxcore::BoxTimer b;
+    Controller j(Role::Jammers, 1, b, nullptr, Mode::Standalone);
+    View v = j.view(0);
+    CHECK(v.emptyLeft == "Red button: sat down" && v.emptyRight == "Blue button: sat down");
+    CHECK(v.hint == "Yellow: pause, held: undo");
+    boxcore::BoxTimer b2;
+    Controller k(Role::Blockers, 1, b2, nullptr, Mode::Standalone);
+    CHECK(k.view(0).hint == "Yellow: sat down\nBlue: pause");
+    btn::gNames = {};
+    CHECK(k.view(0).hint == "Crown: sat down\n2 o'clock: pause");
+}
+
 int main() {
     releaseButton();
+    colourNames();
     menuHoldAndSwapPrompt();
     standaloneBlockers();
     standaloneJammers();

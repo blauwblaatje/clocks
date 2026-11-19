@@ -18,12 +18,9 @@ const upd::Board& kBoard = upd::kStopWatch;
 __attribute__((used)) const char kMarker[] = CLOCK_BOARD_MARKER_PREFIX "m5-stopwatch;";
 const int kSize = 466;
 
-// Which physical button does what. Not decided yet (Rogier, 2026-11-18:
-// "decide when I have one"): for now the power button is the crown and the
-// yellow and blue buttons are the 10 and 2 o'clock buttons, as on the
-// Waveshare. Set kCrownIsPowerButton to false to make the blue button the
-// crown and the power button the 2 o'clock button instead.
-static constexpr bool kCrownIsPowerButton = true;
+// Which physical button does what (Rogier, 2026-11-19, device in hand):
+// yellow (11 o'clock) is the crown, blue (1 o'clock) the 2 o'clock button,
+// the red power button (7 o'clock) the 10 o'clock button.
 
 static const int kW = 466, kH = 466;
 static const int kBufLines = 40; // 466 x 40 x 2 bytes x 2 = 75 KB internal RAM, not a full frame
@@ -173,7 +170,9 @@ static bool readTouch(int& x, int& y) {
 static void touchRead(lv_indev_t*, lv_indev_data_t* data) {
     static int lastX = 0, lastY = 0;
     int x, y;
-    if (digitalRead(PIN_TP_INT) == LOW && readTouch(x, y)) {
+    // The interrupt line stayed high during touches on the first unit
+    // (2026-11-19): read the registers on every poll instead.
+    if (readTouch(x, y)) {
         lastX = x;
         lastY = y;
         data->state = LV_INDEV_STATE_PRESSED;
@@ -206,9 +205,7 @@ static bool powerButton() {
 
 uint8_t buttons() {
     bool yellow = digitalRead(PIN_KEY_A) == LOW, blue = digitalRead(PIN_KEY_B) == LOW, power = powerButton();
-    if (kCrownIsPowerButton)
-        return (power ? kCrown : 0) | (yellow ? kLeft : 0) | (blue ? kRight : 0);
-    return (blue ? kCrown : 0) | (yellow ? kLeft : 0) | (power ? kRight : 0);
+    return (yellow ? kCrown : 0) | (power ? kLeft : 0) | (blue ? kRight : 0);
 }
 
 static bool externalPower() {
@@ -238,7 +235,7 @@ void sleep() {
     if (pmOk) pm1.shutdown();
     delay(500);
     // Still running (no power chip, or on USB the chip keeps the board on):
-    // deep sleep until the yellow button.
+    // deep sleep until the yellow button (the crown).
     esp_sleep_enable_ext1_wakeup_io(1ULL << PIN_KEY_A, ESP_EXT1_WAKEUP_ANY_LOW);
     esp_deep_sleep_start();
     for (;;) {

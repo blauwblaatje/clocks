@@ -70,10 +70,14 @@ class Controller {
     void tick(uint32_t now);
     View view(uint32_t now) const;
 
-    // Menu: the undo button held 3 s asks for it (once); allowed only while
-    // no clock runs. The device layer opens the menu.
+    // Menu: the undo button held 3 s asks for it (once); allowed while no
+    // clock runs, the intermission clock excepted (Rogier, 2026-11-19). The
+    // device layer opens the menu.
     bool takeMenuRequest();
     bool canOpenMenu() const;
+    // No clock runs, intermission included: role changes, updates and
+    // automatic sleep wait for this, so none of them happens mid-intermission.
+    bool idle() const;
     void resetLocalGame(); // menu: standalone game reset
 
     // Picker hit test, shared with the screen code: 0 none, 1 T1 TTO,
@@ -86,6 +90,7 @@ class Controller {
     bool scoreboardBack() const;
 
   private:
+    bool stopped(bool intermissionToo) const; // canOpenMenu, idle
     enum class Hold : uint8_t { None, Crown, Undo };
     enum class CState : uint8_t { Idle, Lineup, Jam, Timeout, Intermission, GameOver };
 

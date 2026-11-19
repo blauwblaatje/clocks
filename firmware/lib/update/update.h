@@ -39,6 +39,11 @@ struct Board {
     const char* name; // for messages
     uint16_t chip;    // ESP image header chip id: ESP32-C6 13, ESP32-S3 9
     bool legacy;      // also takes images without a marker (0.1.0 was built for this board only)
+    // Button colours for the screens (lib/buttons): crown, 10 o'clock and
+    // 2 o'clock button. nullptr = no colours, the screens say "Crown" etc.
+    const char* crownName = nullptr;
+    const char* leftName = nullptr;
+    const char* rightName = nullptr;
 };
 extern const Board kWaveshareC6, kStopWatch;
 const Board* findBoard(const std::string& id); // nullptr = unknown

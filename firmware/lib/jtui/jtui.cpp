@@ -1,4 +1,6 @@
+#include "lvset.h"
 #include "jtui.h"
+#include "buttons.h"
 #include "scale.h"
 
 using ui::px;
@@ -179,7 +181,7 @@ void Ui::buildNoConn() {
     lv_obj_align(lastClock_, LV_ALIGN_CENTER, 0, px(2));
     lastWhat_ = label(noconn_, f_.m12, kGrey, 146);
     noconnHint_ = label(noconn_, f_.m12, 0xffffff, 176);
-    lv_label_set_text(noconnHint_, "Hold Undo: run locally");
+    lv_label_set_text(noconnHint_, ("Hold " + btn::left("Undo") + ": run locally").c_str());
     // hold progress on the inner ring
 }
 
@@ -231,7 +233,7 @@ void Ui::show(const View& v, uint32_t now) {
         setText(lastClock_, v.lastKnownClock);
         setText(lastWhat_, v.lastKnownWhat);
         // The hold reuses the hint line: show progress as text brightness.
-        lv_obj_set_style_text_color(noconnHint_, lv_color_hex(v.holdPermille ? kAmber : 0xffffff), 0);
+        ui::textColor(noconnHint_, lv_color_hex(v.holdPermille ? kAmber : 0xffffff));
         return;
     }
 
@@ -246,8 +248,8 @@ void Ui::show(const View& v, uint32_t now) {
         // CRG's global eJT settings differ: say so, never change them.
         setText(statusText_, v.settingsWarning ? "CRG \xc2\xb7 eJT settings?" : "CRG");
         uint32_t c = v.settingsWarning ? kAmber : kGreen;
-        lv_obj_set_style_text_color(statusText_, lv_color_hex(v.settingsWarning ? kAmber : 0xffffff), 0);
-        lv_obj_set_style_bg_color(statusDot_, lv_color_hex(c), 0);
+        ui::textColor(statusText_, lv_color_hex(v.settingsWarning ? kAmber : 0xffffff));
+        ui::bgColor(statusDot_, lv_color_hex(c));
         lv_obj_update_layout(statusText_);
         lv_obj_align_to(statusDot_, statusText_, LV_ALIGN_OUT_LEFT_MID, px(-6), 0);
     }
@@ -271,35 +273,33 @@ void Ui::show(const View& v, uint32_t now) {
         hintText = "sent\xe2\x80\xa6";
     }
     setText(state_, stateText);
-    lv_obj_set_style_text_color(state_, lv_color_hex(stateColor), 0);
+    ui::textColor(state_, lv_color_hex(stateColor));
     setText(hint_, hintText);
-    lv_obj_set_style_text_color(hint_, lv_color_hex(v.hintDim ? kHintDim : kHint), 0);
+    ui::textColor(hint_, lv_color_hex(v.hintDim ? kHintDim : kHint));
 
-    lv_arc_set_value(ring_, v.ringPermille);
-    lv_obj_set_style_arc_color(ring_, lv_color_hex(tone), LV_PART_INDICATOR);
-    lv_obj_set_style_arc_opa(ring_, v.ringOn ? LV_OPA_COVER : LV_OPA_TRANSP, LV_PART_INDICATOR);
+    // The red flash also takes over the outer ring (set once, not tone then red).
+    lv_arc_set_value(ring_, v.feedbackRed ? 1000 : v.ringPermille);
+    ui::arcColor(ring_, lv_color_hex(v.feedbackRed ? kRed : tone));
+    ui::arcOpa(ring_, v.ringOn ? LV_OPA_COVER : LV_OPA_TRANSP);
 
     // Inner ring: hold progress, pulsing while waiting, red flashes.
     if (v.holdPermille > 0) {
         lv_arc_set_value(inner_, v.holdPermille);
-        lv_obj_set_style_arc_color(inner_, v.holdStage ? lv_color_hex(kBlue) : lv_color_white(), LV_PART_INDICATOR);
-        lv_obj_set_style_arc_opa(inner_, LV_OPA_COVER, LV_PART_INDICATOR);
+        ui::arcColor(inner_, v.holdStage ? lv_color_hex(kBlue) : lv_color_white());
+        ui::arcOpa(inner_, LV_OPA_COVER);
     } else if (v.feedback == Feedback::Waiting) {
         lv_arc_set_value(inner_, 1000);
-        lv_obj_set_style_arc_color(inner_, lv_color_white(), LV_PART_INDICATOR);
+        ui::arcColor(inner_, lv_color_white());
         uint32_t ph = now % 600;
         uint32_t opa = ph < 300 ? 60 + ph * 195 / 300 : 255 - (ph - 300) * 195 / 300;
-        lv_obj_set_style_arc_opa(inner_, (lv_opa_t)opa, LV_PART_INDICATOR);
+        ui::arcOpa(inner_, (lv_opa_t)opa);
     } else if (v.feedbackRed) {
         lv_arc_set_value(inner_, 1000);
-        lv_obj_set_style_arc_color(inner_, lv_color_hex(kRed), LV_PART_INDICATOR);
-        lv_obj_set_style_arc_opa(inner_, LV_OPA_COVER, LV_PART_INDICATOR);
+        ui::arcColor(inner_, lv_color_hex(kRed));
+        ui::arcOpa(inner_, LV_OPA_COVER);
     } else {
-        lv_obj_set_style_arc_opa(inner_, LV_OPA_TRANSP, LV_PART_INDICATOR);
+        ui::arcOpa(inner_, LV_OPA_TRANSP);
     }
-    // The red flash also takes over the outer ring.
-    if (v.feedbackRed) lv_obj_set_style_arc_color(ring_, lv_color_hex(kRed), LV_PART_INDICATOR);
-    if (v.feedbackRed) lv_arc_set_value(ring_, 1000);
 }
 
 } // namespace jt

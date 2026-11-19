@@ -117,7 +117,7 @@ class EspFetch : public upd::Fetch {
             opened_ = true;
             return 1;
         }
-        char buf[4096];
+        static char buf[4096]; // not on the loop task's stack (wsposix.cpp)
         int n = esp_http_client_read(c_, buf, sizeof buf);
         if (n < 0) return fail("read failed");
         if (n > 0) chunk.assign(buf, (size_t)n);
@@ -249,6 +249,9 @@ class BoardPlatform : public dev::Platform {
         return i;
     }
     void stopSetup() override { apCloseWhenJoined_ = true; }
+    // The setup page is always on (Rogier, 2026-11-19), once the network
+    // stack is up: on the hall Wi-Fi or on the access point.
+    int webPort() override { return WiFi.status() == WL_CONNECTED || apOpen_ ? 80 : 0; }
 
     // ---- updates ----
     std::string firmwareVersion() override { return FW_VERSION; }
@@ -269,9 +272,10 @@ class BoardPlatform : public dev::Platform {
 
     std::vector<std::string> info() override {
         std::vector<std::string> l = board::info();
-        if (WiFi.status() == WL_CONNECTED)
+        if (WiFi.status() == WL_CONNECTED) {
             l.push_back(std::string("Wi-Fi: ") + WiFi.SSID().c_str() + ", " + std::to_string(WiFi.RSSI()) + " dBm");
-        else l.push_back("Wi-Fi: not connected");
+            l.push_back(std::string("IP: ") + WiFi.localIP().toString().c_str());
+        } else l.push_back("Wi-Fi: not connected");
         const esp_partition_t* run = esp_ota_get_running_partition();
         l.push_back(std::string("Firmware: " FW_VERSION) + (run ? std::string(" (") + run->label + ")" : ""));
         l.push_back(std::string("Board: ") + board::kBoard.name);
@@ -306,6 +310,11 @@ static const uint32_t kLockoutMs = 20;
 
 static BoardPlatform platform;
 static dev::Device* device = nullptr;
+
+// The loop task's stack: 16 KB instead of Arduino's 8 KB, for LVGL, the
+// CRG client and the setup page in one task (an 8 KB buffer overran 8 KB on
+// the StopWatch, 2026-11-19).
+SET_LOOP_TASK_STACK_SIZE(16 * 1024);
 
 void setup() {
     Serial.begin(115200);

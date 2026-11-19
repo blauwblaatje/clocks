@@ -9,7 +9,7 @@ SDL_CFLAGS := $(shell pkg-config --cflags sdl2)
 SDL_LIBS := $(shell pkg-config --libs sdl2)
 INC := -I. -I$(LVGL) -I$(FW)/jamcore -I$(FW)/crgclient -I$(FW)/jtctl -I$(FW)/jtui -I$(FW)/boxcore -I$(FW)/boxctl \
        -I$(FW)/boxui -I$(FW)/devmenu -I$(FW)/devmenuui -I$(FW)/wsposix -I$(FW)/device \
-       -I$(FW)/settings -I$(FW)/httpmini -I$(FW)/update -I$(FW)/jtfonts466 $(SDL_CFLAGS)
+       -I$(FW)/settings -I$(FW)/httpmini -I$(FW)/update -I$(FW)/buttons -I$(FW)/jtfonts466 $(SDL_CFLAGS)
 DEFS := -DLV_CONF_INCLUDE_SIMPLE -DSIM_FONT_DIR='"$(abspath deps/montserrat)"'
 CFLAGS := -O2 -g $(INC) $(DEFS)
 CXXFLAGS := -std=c++17 -O1 -g -Wall $(INC) $(DEFS)

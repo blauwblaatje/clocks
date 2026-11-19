@@ -531,16 +531,16 @@ static const lv_font_fmt_txt_glyph_dsc_t glyph_dsc[] = {
     {.bitmap_index = 0, .adv_w = 0, .box_w = 0, .box_h = 0, .ofs_x = 0, .ofs_y = 0} /* id = 0 reserved */,
     {.bitmap_index = 0, .adv_w = 265, .box_w = 13, .box_h = 5, .ofs_x = 2, .ofs_y = 10},
     {.bitmap_index = 33, .adv_w = 168, .box_w = 8, .box_h = 8, .ofs_x = 1, .ofs_y = 0},
-    {.bitmap_index = 65, .adv_w = 463, .box_w = 27, .box_h = 30, .ofs_x = 1, .ofs_y = 0},
-    {.bitmap_index = 470, .adv_w = 262, .box_w = 13, .box_h = 30, .ofs_x = 0, .ofs_y = 0},
-    {.bitmap_index = 665, .adv_w = 400, .box_w = 24, .box_h = 30, .ofs_x = 0, .ofs_y = 0},
-    {.bitmap_index = 1025, .adv_w = 400, .box_w = 24, .box_h = 30, .ofs_x = 0, .ofs_y = 0},
+    {.bitmap_index = 65, .adv_w = 467, .box_w = 27, .box_h = 30, .ofs_x = 1, .ofs_y = 0},
+    {.bitmap_index = 470, .adv_w = 467, .box_w = 13, .box_h = 30, .ofs_x = 8, .ofs_y = 0},
+    {.bitmap_index = 665, .adv_w = 467, .box_w = 24, .box_h = 30, .ofs_x = 3, .ofs_y = 0},
+    {.bitmap_index = 1025, .adv_w = 467, .box_w = 24, .box_h = 30, .ofs_x = 3, .ofs_y = 0},
     {.bitmap_index = 1385, .adv_w = 467, .box_w = 28, .box_h = 30, .ofs_x = 1, .ofs_y = 0},
-    {.bitmap_index = 1805, .adv_w = 402, .box_w = 24, .box_h = 30, .ofs_x = 0, .ofs_y = 0},
-    {.bitmap_index = 2165, .adv_w = 431, .box_w = 25, .box_h = 30, .ofs_x = 1, .ofs_y = 0},
-    {.bitmap_index = 2540, .adv_w = 418, .box_w = 24, .box_h = 30, .ofs_x = 1, .ofs_y = 0},
-    {.bitmap_index = 2900, .adv_w = 449, .box_w = 26, .box_h = 30, .ofs_x = 1, .ofs_y = 0},
-    {.bitmap_index = 3290, .adv_w = 431, .box_w = 25, .box_h = 30, .ofs_x = 1, .ofs_y = 0},
+    {.bitmap_index = 1805, .adv_w = 467, .box_w = 24, .box_h = 30, .ofs_x = 3, .ofs_y = 0},
+    {.bitmap_index = 2165, .adv_w = 467, .box_w = 25, .box_h = 30, .ofs_x = 2, .ofs_y = 0},
+    {.bitmap_index = 2540, .adv_w = 467, .box_w = 24, .box_h = 30, .ofs_x = 3, .ofs_y = 0},
+    {.bitmap_index = 2900, .adv_w = 467, .box_w = 26, .box_h = 30, .ofs_x = 2, .ofs_y = 0},
+    {.bitmap_index = 3290, .adv_w = 467, .box_w = 25, .box_h = 30, .ofs_x = 2, .ofs_y = 0},
     {.bitmap_index = 3665, .adv_w = 168, .box_w = 8, .box_h = 23, .ofs_x = 1, .ofs_y = 0}
 };
 
@@ -628,11 +628,11 @@ static lv_font_fmt_txt_dsc_t font_dsc = {
     .glyph_bitmap = glyph_bitmap,
     .glyph_dsc = glyph_dsc,
     .cmaps = cmaps,
-    .kern_dsc = &kern_classes,
+    .kern_dsc = NULL, /* tabular digits: no kerning (tools/fonts/tabular.py) */
     .kern_scale = 16,
     .cmap_num = 1,
     .bpp = 4,
-    .kern_classes = 1,
+    .kern_classes = 0,
     .bitmap_format = 0,
 #if LV_VERSION_CHECK(8, 0, 0)
     .cache = &cache

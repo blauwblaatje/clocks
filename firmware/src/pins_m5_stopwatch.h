@@ -30,12 +30,13 @@
 #define PIN_SYS_SCL 48
 #define PIN_TP_INT 13
 #define PIN_PM_IRQ 12 // M5PM1 interrupt (not used)
-// Touch: CST820 at 0x15 (CST816S protocol) reporting 0..233 per axis, half
-// the display (M5GFX: touch range 0..233). Some units have a CST9217 at 0x5A
+// Touch: CST820 at 0x15 (CST816S protocol) reporting 0..465 per axis, the
+// display's own resolution (measured on a unit 2026-11-19; the interrupt line
+// cannot be relied on, the registers are polled). Some units have a CST9217 at 0x5A
 // instead (M5GFX probes for it); that one is not supported here yet.
 #define TP_I2C_ADDR 0x15
 #define TP_CST9217_ADDR 0x5A
-#define TP_RANGE 234
+#define TP_RANGE 466
 // M5PM1 power chip
 #define PM1_I2C_ADDR 0x6E
 #define PM1_PIN_CHG_STAT 2 // PM1 GPIO2: low while charging

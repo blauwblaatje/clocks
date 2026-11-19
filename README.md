@@ -33,10 +33,10 @@ from the scoreboard source) and docs/display.md (the screens).
     g++ -std=c++17 -Ilib/jamcore test/native/test_jamcore.cpp lib/jamcore/jamcore.cpp -o /tmp/t && /tmp/t
     g++ -std=c++17 -Wall -Ilib/crgclient test/native/test_crgclient.cpp lib/crgclient/*.cpp -o /tmp/tc && /tmp/tc
 
-    g++ -std=c++17 -Wall -Ilib/jamcore -Ilib/crgclient -Ilib/jtctl test/native/test_jtctl.cpp lib/jamcore/jamcore.cpp lib/crgclient/*.cpp lib/jtctl/jtctl.cpp -o /tmp/tt && /tmp/tt
+    g++ -std=c++17 -Wall -Ilib/jamcore -Ilib/crgclient -Ilib/jtctl -Ilib/buttons test/native/test_jtctl.cpp lib/jamcore/jamcore.cpp lib/crgclient/*.cpp lib/jtctl/jtctl.cpp -o /tmp/tt && /tmp/tt
 
     g++ -std=c++17 -Wall -Ilib/boxcore test/native/test_boxcore.cpp lib/boxcore/boxcore.cpp -o /tmp/tb && /tmp/tb
-    g++ -std=c++17 -Wall -Ilib/boxcore -Ilib/crgclient -Ilib/boxctl test/native/test_boxctl.cpp lib/boxcore/boxcore.cpp lib/crgclient/*.cpp lib/boxctl/boxctl.cpp -o /tmp/tx && /tmp/tx
+    g++ -std=c++17 -Wall -Ilib/boxcore -Ilib/crgclient -Ilib/boxctl -Ilib/buttons test/native/test_boxctl.cpp lib/boxcore/boxcore.cpp lib/crgclient/*.cpp lib/boxctl/boxctl.cpp -o /tmp/tx && /tmp/tx
     g++ -std=c++17 -Wall -Ilib/devmenu test/native/test_devmenu.cpp lib/devmenu/devmenu.cpp -o /tmp/tm && /tmp/tm
     g++ -std=c++17 -Wall -Ilib/settings test/native/test_settings.cpp lib/settings/settings.cpp -o /tmp/ts && /tmp/ts
     g++ -std=c++17 -Wall -pthread -Ilib/httpmini test/native/test_httpmini.cpp lib/httpmini/httpmini.cpp -o /tmp/th && /tmp/th

@@ -53,6 +53,10 @@ class Platform {
     };
     virtual SetupInfo startSetup() = 0;
     virtual void stopSetup() = 0;
+    // The setup page outside Setup too (Rogier, 2026-11-19: "always on"):
+    // the port to serve it on now, 0 = not (yet). Board: 80 once on a
+    // network; simulator: 0, the page only while Setup is open.
+    virtual int webPort() { return 0; }
     // Firmware updates (lib/update, HANDOVER section 8)
     virtual std::string firmwareVersion() = 0;
     virtual const upd::Board& board() = 0;                                  // which firmware this is (updates)
@@ -127,6 +131,9 @@ class Device : public menu::Host {
     void showUpdate(uint32_t now);
     void updateTouch(int x, int y, uint32_t now);
     void start(bool connected);
+    void setButtonNames();
+    bool serveWeb(int port, std::string& err);
+    void buildSetupScreen(const Platform::SetupInfo& info);
     void pump(uint32_t now);
     void flush();
     void stopSetupScreen();

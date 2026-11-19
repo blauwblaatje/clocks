@@ -1,4 +1,5 @@
 #include "boxctl.h"
+#include "buttons.h"
 #include <algorithm>
 #include <cstdio>
 
@@ -575,8 +576,8 @@ View Controller::view(uint32_t now) const {
             if (s.side == 0 || s.side == 1) sides[s.side] = s;
         }
         v.slots = sides;
-        v.emptyLeft = "Left button: sat down";
-        v.emptyRight = "Right button: sat down";
+        v.emptyLeft = btn::left("Left") + " button: sat down";
+        v.emptyRight = btn::right("Right") + " button: sat down";
         v.teamLeft = "TEAM " + std::to_string(teamOfSide(0));
         v.teamRight = "TEAM " + std::to_string(teamOfSide(1));
         if (conn) {
@@ -584,9 +585,9 @@ View Controller::view(uint32_t now) const {
             if (!g.team[teamOfSide(0) - 1].name.empty()) v.teamLeft = g.team[teamOfSide(0) - 1].name;
             if (!g.team[teamOfSide(1) - 1].name.empty()) v.teamRight = g.team[teamOfSide(1) - 1].name;
         }
-        v.hint = conn ? "Crown held: undo" : "Crown: pause, held: undo";
+        v.hint = conn ? btn::crown() + " held: undo" : btn::crown() + ": pause, held: undo";
     } else {
-        v.hint = conn ? "Crown: sat down\n2 o'clock: release" : "Crown: sat down\n2 o'clock: pause";
+        v.hint = btn::crown() + ": sat down\n" + btn::right() + (conn ? ": release" : ": pause");
     }
     if (conn) {
         if (lastOutcome_ == Outcome::Pending && pressId_ != 0) {

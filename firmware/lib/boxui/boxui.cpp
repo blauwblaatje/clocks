@@ -1,4 +1,6 @@
+#include "lvset.h"
 #include "boxui.h"
+#include "buttons.h"
 #include "scale.h"
 
 using ui::px;
@@ -318,29 +320,31 @@ void Ui::buildNoConn(const View& v) {
     lv_label_set_text(s, "Buttons are not sent");
     lv_obj_align(s, LV_ALIGN_TOP_MID, 0, px(98));
     lv_obj_t* h = label(root_, f_.m12, 0xffffff);
-    lv_label_set_text(h, v.role == Role::Jammers ? "Hold crown: run locally" : "Hold 10 o'clock: run locally");
+    std::string hold = "Hold " + (v.role == Role::Jammers ? btn::crown("crown") : btn::left()) + ": run locally";
+    lv_label_set_text(h, hold.c_str());
     lv_obj_align(h, LV_ALIGN_TOP_MID, 0, px(150));
 }
 
-void Ui::updateBand(Band& b, const Slot& s, bool small, const View& v) {
+// single: the only skater, text on black and the ring in the state colour
+// (each colour set once per update: lvset.h).
+void Ui::updateBand(Band& b, const Slot& s, bool small, const View& v, bool single) {
     (void)small;
     bool empty = s.key.empty();
     uint32_t fill = empty ? kEmpty : fillOf(s.phase);
     uint32_t text = empty ? 0xffffff : textOn(s.phase);
-    if (b.fill) lv_obj_set_style_bg_color(b.fill, lv_color_hex(fill), 0);
-    auto col = [&](lv_obj_t* l) {
-        if (l) lv_obj_set_style_text_color(l, lv_color_hex(text), 0);
+    if (b.fill) ui::bgColor(b.fill, lv_color_hex(fill));
+    auto col = [&](lv_obj_t* l, uint32_t c) {
+        if (l) ui::textColor(l, lv_color_hex(c));
     };
-    col(b.number);
-    col(b.clock);
-    col(b.state);
+    col(b.number, single ? 0xffffff : text);
+    col(b.clock, single ? 0xffffff : text);
+    col(b.state, single ? (fill == kWaiting ? 0xee6666 : fill) : text);
     if (v.role == Role::Jammers) {
         int side = &b == &bands_[0] ? 0 : 1;
         setText(b.team, side == 0 ? v.teamLeft : v.teamRight);
         if (emptyText_[side]) {
             setText(emptyText_[side], side == 0 ? v.emptyLeft : v.emptyRight);
-            if (empty) lv_obj_remove_flag(emptyText_[side], LV_OBJ_FLAG_HIDDEN);
-            else lv_obj_add_flag(emptyText_[side], LV_OBJ_FLAG_HIDDEN);
+            ui::visible(emptyText_[side], empty);
         }
     }
     setText(b.number, empty ? "" : (s.number.empty() ? "" : "#" + s.number));
@@ -371,23 +375,22 @@ void Ui::show(const View& v, uint32_t now) {
     }
     if (status_) {
         setText(status_, status);
-        lv_obj_set_style_text_color(status_, lv_color_hex(statusColor), 0);
+        ui::textColor(status_, lv_color_hex(statusColor));
     }
     if (statusDot_) {
-        lv_obj_set_style_bg_color(statusDot_, lv_color_hex(v.mode == Mode::Connected ? kGreenDot : kBlue), 0);
+        ui::bgColor(statusDot_, lv_color_hex(v.mode == Mode::Connected ? kGreenDot : kBlue));
         lv_obj_update_layout(status_);
         lv_obj_align_to(statusDot_, status_, LV_ALIGN_OUT_LEFT_MID, px(-5), 0);
     }
     setText(hint_, v.hint);
     if (notice_) {
         setText(notice_, v.notice);
-        if (v.notice.empty()) lv_obj_add_flag(notice_, LV_OBJ_FLAG_HIDDEN);
-        else lv_obj_remove_flag(notice_, LV_OBJ_FLAG_HIDDEN);
+        ui::visible(notice_, !v.notice.empty());
     }
     if (hold_) {
         lv_arc_set_value(hold_, v.holdPermille);
-        lv_obj_set_style_arc_color(hold_, lv_color_hex(v.holdStage ? kBlue : 0xffffff), LV_PART_INDICATOR);
-        lv_obj_set_style_arc_opa(hold_, v.holdPermille ? LV_OPA_COVER : LV_OPA_TRANSP, LV_PART_INDICATOR);
+        ui::arcColor(hold_, lv_color_hex(v.holdStage ? kBlue : 0xffffff));
+        ui::arcOpa(hold_, v.holdPermille ? LV_OPA_COVER : LV_OPA_TRANSP);
     }
 
     switch (v.screen) {
@@ -399,20 +402,15 @@ void Ui::show(const View& v, uint32_t now) {
             setText(b.number, "");
             setText(b.clock, "");
             setText(b.state, "BOX EMPTY");
-            lv_obj_set_style_text_color(b.state, lv_color_hex(0x8f8f8f), 0);
+            ui::textColor(b.state, lv_color_hex(0x8f8f8f));
             lv_arc_set_value(ring_, 0);
         } else {
             int n = v.slots.size() > 3 ? 3 : (int)v.slots.size();
-            for (int i = 0; i < n; i++) updateBand(bands_[i], v.slots[i], n == 3 && i != 1, v);
+            for (int i = 0; i < n; i++) updateBand(bands_[i], v.slots[i], n == 3 && i != 1, v, n == 1);
             if (n == 1) {
                 // single skater: text on black, the ring carries the state colour
-                const Slot& s = v.slots[0];
-                uint32_t c = fillOf(s.phase);
-                lv_obj_set_style_text_color(bands_[0].number, lv_color_white(), 0);
-                lv_obj_set_style_text_color(bands_[0].clock, lv_color_white(), 0);
-                lv_obj_set_style_text_color(bands_[0].state, lv_color_hex(c == kWaiting ? 0xee6666 : c), 0);
                 lv_arc_set_value(ring_, 1000);
-                lv_obj_set_style_arc_color(ring_, lv_color_hex(c), LV_PART_INDICATOR);
+                ui::arcColor(ring_, lv_color_hex(fillOf(v.slots[0].phase)));
             }
         }
         break;
@@ -420,22 +418,23 @@ void Ui::show(const View& v, uint32_t now) {
         setText(pickTitle_, v.pickTitle);
         for (int i = 0; i < 4; i++) {
             const PickItem& p = v.pick[i];
-            lv_obj_set_style_bg_color(pick_[i], lv_color_hex(p.unserved ? kUnserved : kButton), 0);
-            lv_obj_set_style_bg_opa(pick_[i], p.inBox ? LV_OPA_40 : LV_OPA_COVER, 0);
+            ui::bgColor(pick_[i], lv_color_hex(p.unserved ? kUnserved : kButton));
+            ui::bgOpa(pick_[i], p.inBox ? LV_OPA_40 : LV_OPA_COVER);
             setText(pickLabel_[i], p.label);
             setText(pickNumber_[i], p.number);
             uint32_t tc = p.unserved ? 0x000000 : 0xffffff;
-            lv_obj_set_style_text_color(pickLabel_[i], lv_color_hex(p.unserved ? 0x000000 : 0xd6d6d6), 0);
-            lv_obj_set_style_text_color(pickNumber_[i], lv_color_hex(tc), 0);
+            ui::textColor(pickLabel_[i], lv_color_hex(p.unserved ? 0x000000 : 0xd6d6d6));
+            ui::textColor(pickNumber_[i], lv_color_hex(tc));
         }
         break;
     case Screen::Menu:
         setText(menuNumber_, v.menuNumber);
         setText(menuClock_, v.menuClock);
         // standalone clocks have no roster number: centre the clock
-        lv_obj_align(menuClock_, LV_ALIGN_TOP_MID, px(v.menuNumber.empty() ? 0 : 36), px(44));
-        lv_obj_set_style_bg_opa(menuPenalty_, v.menuCanPenalty ? LV_OPA_COVER : LV_OPA_30, 0);
-        lv_obj_set_style_bg_opa(menuChange_, v.menuCanChange ? LV_OPA_COVER : LV_OPA_30, 0);
+        if (int mx = px(v.menuNumber.empty() ? 0 : 36); lv_obj_get_style_x(menuClock_, LV_PART_MAIN) != mx)
+            lv_obj_align(menuClock_, LV_ALIGN_TOP_MID, mx, px(44));
+        ui::bgOpa(menuPenalty_, v.menuCanPenalty ? LV_OPA_COVER : LV_OPA_30);
+        ui::bgOpa(menuChange_, v.menuCanChange ? LV_OPA_COVER : LV_OPA_30);
         break;
     case Screen::NoConn:
     case Screen::SwapPrompt:

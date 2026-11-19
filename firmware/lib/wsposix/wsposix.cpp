@@ -194,7 +194,10 @@ bool WsConn::send(const std::string& text) { return sendFrame(1, text); }
 
 bool WsConn::poll(std::vector<std::string>& messages) {
     if (fd_ < 0) return false;
-    char buf[8192];
+    // Not on the stack: Arduino's loop task has 8 KB of stack in all, and
+    // this buffer alone overran it on the first real CRG (2026-11-19).
+    // One thread polls, so one buffer for all connections is fine.
+    static char buf[8192];
     for (;;) {
         ssize_t n = recv(fd_, buf, sizeof buf, 0);
         if (n > 0) {

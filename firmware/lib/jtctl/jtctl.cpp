@@ -1,4 +1,5 @@
 #include "jtctl.h"
+#include "buttons.h"
 #include <cstdio>
 
 namespace jt {
@@ -226,7 +227,7 @@ void Controller::undoAction(uint32_t now) {
 
 // The menu only opens while no clock runs (HANDOVER section 6), or while
 // the connection is lost (to switch mode or run setup).
-bool Controller::canOpenMenu() const {
+bool Controller::stopped(bool intermissionToo) const {
     if (mode_ == Mode::Standalone) {
         jamcore::State s = local_.state();
         return s == jamcore::State::Idle || s == jamcore::State::PeriodOver;
@@ -234,11 +235,14 @@ bool Controller::canOpenMenu() const {
     if (!client_ || !client_->connected() || !client_->synced()) return true;
     const crg::GameState& g = client_->game();
     if (g.inJam) return false;
-    for (int c : {ClkJam, ClkLineup, ClkTimeout, ClkIntermission}) {
+    for (int c : {ClkJam, ClkLineup, ClkTimeout}) {
         if (g.clock[c].running) return false;
     }
-    return true;
+    return !(intermissionToo && g.clock[ClkIntermission].running);
 }
+
+bool Controller::canOpenMenu() const { return stopped(false); }
+bool Controller::idle() const { return stopped(true); }
 
 bool Controller::takeMenuRequest() {
     bool r = menuRequested_;
@@ -308,7 +312,7 @@ void Controller::viewConnected(View& v, uint32_t now) const {
     const crg::ClockState& pc = g.clock[ClkPeriod];
     v.period = "Period " + formatClock(client_->displayMs(pc, now), true);
     CrownAction a = client_->crownAction();
-    v.hint = std::string("Crown: ") + (a == CrownAction::StopJam ? g.labelStop : a == CrownAction::StartJam ? "Start Jam" : "---");
+    v.hint = btn::crown() + ": " + (a == CrownAction::StopJam ? g.labelStop : a == CrownAction::StartJam ? "Start Jam" : "---");
     switch (cstate()) {
     case CState::Jam: {
         const crg::ClockState& c = g.clock[ClkJam];
@@ -357,7 +361,7 @@ void Controller::viewConnected(View& v, uint32_t now) const {
             v.state = "READY";
             v.tone = Tone::Idle;
             v.ringPermille = 0;
-            if (g.labelStop == "Lineup") v.hint = "Crown: Jam \xc2\xb7 Undo: Lineup";
+            if (g.labelStop == "Lineup") v.hint = btn::crown() + ": Jam \xc2\xb7 " + btn::left("Undo") + ": Lineup";
         } else {
             v.clock = formatClock(ms, false);
             v.state = "LINEUP";
@@ -388,7 +392,7 @@ void Controller::viewLocal(View& v, uint32_t now) const {
     const jamcore::Config& cfg = local_.config();
     std::string P = "P" + std::to_string(local_.period()) + " " + kDot + " ";
     v.period = "Period " + formatClock(local_.periodRemaining(now), true);
-    v.hint = std::string("Crown: ") + local_.crownLabel();
+    v.hint = btn::crown() + ": " + local_.crownLabel();
     switch (local_.state()) {
     case State::Jam: {
         uint32_t ms = local_.jamRemaining(now);
@@ -430,7 +434,7 @@ void Controller::viewLocal(View& v, uint32_t now) const {
         v.clock = formatClock(cfg.jamMs, true);
         v.state = "READY";
         v.tone = Tone::Idle;
-        v.hint = "Crown: Jam \xc2\xb7 Undo: Lineup";
+        v.hint = btn::crown() + ": Jam \xc2\xb7 " + btn::left("Undo") + ": Lineup";
         break;
     }
     if (!local_.canUndo()) {

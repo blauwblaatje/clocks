@@ -47,13 +47,12 @@ M5Unified, M5PM1 and demo sources).
 - ESP32-S3R8: 16 MB flash, 8 MB octal PSRAM. 2.4 GHz Wi-Fi.
 - 1.75" round AMOLED, 466 x 466, CO5300 over QSPI (through Arduino_GFX).
   Brightness is a panel command; black pixels are off.
-- Touch CST820 at 0x15, half resolution (0..233). Some units have a
+- Touch CST820 at 0x15, full resolution (0..465, measured 2026-11-19). Some units have a
   CST9217 (0x5A) instead: not supported yet.
 - Buttons: yellow (KEY A, GPIO2) upper left and blue (KEY B, GPIO1) upper
   right on the front; the power button through the M5PM1 power chip (read
-  over I2C). Which one is the crown is open: decide with the device in hand
-  (`kCrownIsPowerButton` in board_m5_stopwatch.cpp; for now the power
-  button, with yellow = 10 o'clock and blue = 2 o'clock).
+  over I2C), red, at 7 o'clock. Decided 2026-11-19 with the device in hand:
+  yellow = crown, blue = 2 o'clock button, red = 10 o'clock button.
 - M5PM1 power chip (0x6E): battery voltage, USB 5 V present, charging,
   power off. The firmware turns off its "click = reset" and "double click =
   power off" so the power button can be a game button; Sleep in the menu

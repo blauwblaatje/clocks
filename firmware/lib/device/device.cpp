@@ -1,7 +1,9 @@
+#include "lvset.h"
 #include "device.h"
 
 #include "boxcore.h"
 #include "jamcore.h"
+#include "buttons.h"
 #include "scale.h"
 
 using ui::px;
@@ -25,7 +27,7 @@ struct JtApp : App {
     void show(uint32_t now) override { ui.show(ctl.view(now), now); }
     lv_obj_t* root() override { return ui.root(); }
     bool takeMenuRequest() override { return ctl.takeMenuRequest(); }
-    bool idle(uint32_t) override { return ctl.canOpenMenu(); }
+    bool idle(uint32_t) override { return ctl.idle(); }
     bool connected() const override { return ctl.mode() == jt::Mode::Connected; }
     void setConnected(bool c) override { ctl.setMode(c ? jt::Mode::Connected : jt::Mode::Standalone); }
     void resetGame() override { ctl.resetLocalGame(); }
@@ -98,13 +100,13 @@ void Device::updateBattery(uint32_t now) {
     int pct = 0;
     bool charging = false;
     if (!p_.battery(pct, charging)) {
-        lv_obj_add_flag(battery_, LV_OBJ_FLAG_HIDDEN);
+        ui::visible(battery_, false);
         return;
     }
     std::string t = std::to_string(pct) + "%" + (charging ? " \xe2\x86\xaf" : ""); // ↯ while charging
     if (t != lv_label_get_text(battery_)) lv_label_set_text(battery_, t.c_str());
-    lv_obj_set_style_text_color(battery_, lv_color_hex(pct <= 15 && !charging ? 0xff6a5e : 0xb4b4b4), 0);
-    lv_obj_remove_flag(battery_, LV_OBJ_FLAG_HIDDEN);
+    ui::textColor(battery_, lv_color_hex(pct <= 15 && !charging ? 0xff6a5e : 0xb4b4b4));
+    ui::visible(battery_, true);
 }
 
 // Automatic sleep (HANDOVER section 8): after sleepMinutes with no clock
@@ -209,12 +211,19 @@ menu::Refusal Device::startSetup() {
     Platform::SetupInfo info = p_.startSetup();
     if (!info.error.empty()) return info.error;
     std::string err;
-    if (!http_.running() && !http_.start(info.httpPort, [this](const http::Request& r) { return handle(r); }, err)) {
+    if (!http_.running() && !serveWeb(info.httpPort, err)) {
         p_.stopSetup();
         return "Setup page failed: " + err;
     }
+    menu_.close();
+    buildSetupScreen(info);
+    return "";
+}
+
+// The setup page, with firmware.bin uploads streamed into the update slot.
+bool Device::serveWeb(int port, std::string& err) {
+    if (!http_.start(port, [this](const http::Request& r) { return handle(r); }, err)) return false;
     p_.log("setup page on port " + std::to_string(http_.port()));
-    // firmware.bin from the setup page, streamed into the update slot
     http::Upload u;
     u.path = "/update";
     u.begin = [this](size_t len) {
@@ -234,7 +243,11 @@ menu::Refusal Device::startSetup() {
     };
     u.abort = [this](const std::string& why) { update_.abortUpload(why); };
     http_.setUpload(u);
-    menu_.close();
+    return true;
+}
+
+// The setup screen: the access point and the page on it.
+void Device::buildSetupScreen(const Platform::SetupInfo& info) {
     // Setup screen: QR code and how to connect. Any button closes it.
     setupRoot_ = lv_obj_create(screen_);
     lv_obj_remove_style_all(setupRoot_);
@@ -271,14 +284,13 @@ menu::Refusal Device::startSetup() {
     lv_obj_set_style_text_color(hint, lv_color_hex(0x8f8f8f), 0);
     lv_label_set_text(hint, "Any button: close");
     lv_obj_align(hint, LV_ALIGN_TOP_MID, 0, px(y + 4));
-    return "";
 }
 
 void Device::stopSetupScreen() {
     if (!setupRoot_) return;
     lv_obj_delete(setupRoot_);
     setupRoot_ = nullptr;
-    http_.stop();
+    if (!p_.webPort()) http_.stop(); // always on where the platform serves it
     p_.stopSetup();
 }
 
@@ -329,7 +341,8 @@ void Device::applySettings(const cfg::Settings& s, std::string& note) {
                         old.periodMs != s.periodMs || old.periods != s.periods || old.jamAutoEnd != s.jamAutoEnd ||
                         old.periodAfterTimeout != s.periodAfterTimeout || old.undoLevels != s.undoLevels;
     bool restart = (menu::RoleId)s.role != role_ || host != host_ || port != port_ ||
-                   (rulesChanged && role_ == menu::RoleId::JamTimer);
+                   (rulesChanged && role_ == menu::RoleId::JamTimer) ||
+                   old.swapButtons[(int)role_] != s.swapButtons[(int)role_]; // the names on screen
     if (!restart) return;
     if (!app_->idle(p_.now())) {
         note = " Some changes apply when no clock runs and the box is empty.";
@@ -462,6 +475,11 @@ void Device::loop() {
     // The board may fall back to another saved network: follow its scoreboard.
     if (p_.now() - netCheckAt_ >= 2000) {
         netCheckAt_ = p_.now();
+        // The setup page, always on once the platform can serve it.
+        if (!http_.running() && p_.webPort()) {
+            std::string err;
+            if (!serveWeb(p_.webPort(), err)) p_.log("setup page failed: " + err);
+        }
         if (app_->idle(p_.now()) && !setupRoot_ && !updateRoot_) restartIfScoreboardChanged();
     }
     app_->tick(p_.now());
@@ -472,7 +490,16 @@ void Device::loop() {
     menuUi_->show(menu_.view());
 }
 
+// Button names on screen (lib/buttons), with this role's swap of the side
+// buttons.
+void Device::setButtonNames() {
+    const upd::Board& bd = p_.board();
+    bool sw = settings_.swapButtons[(int)role_];
+    btn::gNames = {bd.crownName, sw ? bd.rightName : bd.leftName, sw ? bd.leftName : bd.rightName};
+}
+
 void Device::start(bool connected) {
+    setButtonNames();
     delete app_;
     app_ = nullptr;
     ws_.close();
@@ -759,7 +786,7 @@ void Device::showUpdate(uint32_t) {
     lv_label_set_text(updTitle_, title.c_str());
     lv_label_set_text(updLine_, line.c_str());
     lv_label_set_text(updNote_, note.c_str());
-    lv_obj_set_style_text_color(updNote_, lv_color_hex(noteColor), 0);
+    ui::textColor(updNote_, lv_color_hex(noteColor));
     lv_label_set_text(updHint_, hint.c_str());
     auto vis = [](lv_obj_t* o, bool on) {
         if (on) lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);

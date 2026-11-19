@@ -1,3 +1,4 @@
+#include "lvset.h"
 #include "devmenuui.h"
 #include "scale.h"
 
@@ -118,8 +119,7 @@ void Ui::show(const View& v) {
         build(v);
         key_ = k;
     }
-    if (v.screen == Screen::Closed) lv_obj_add_flag(root_, LV_OBJ_FLAG_HIDDEN);
-    else lv_obj_remove_flag(root_, LV_OBJ_FLAG_HIDDEN);
+    ui::visible(root_, v.screen != Screen::Closed);
 }
 
 } // namespace menu

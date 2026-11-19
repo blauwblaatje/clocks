@@ -25,7 +25,7 @@ class Ui {
     void buildPicker();
     void buildMenu();
     void buildNoConn(const View& v);
-    void updateBand(Band& b, const Slot& s, bool small, const View& v);
+    void updateBand(Band& b, const Slot& s, bool small, const View& v, bool single = false);
     lv_obj_t* label(lv_obj_t* parent, const lv_font_t* f, uint32_t color);
 
     jt::Fonts f_;

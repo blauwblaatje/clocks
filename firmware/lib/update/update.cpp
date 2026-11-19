@@ -71,7 +71,9 @@ std::string resolve(const std::string& base, const std::string& ref) {
 // ---------- boards ----------
 
 const Board kWaveshareC6 = {"waveshare-c6", "Waveshare ESP32-C6 1.28", 13, true};
-const Board kStopWatch = {"m5-stopwatch", "M5Stack StopWatch", 9, false};
+// Yellow at 11 o'clock, blue at 1 o'clock, red (power) at 7 o'clock; the
+// mapping is in board_m5_stopwatch.cpp (decided 2026-11-19).
+const Board kStopWatch = {"m5-stopwatch", "M5Stack StopWatch", 9, false, "Yellow", "Red", "Blue"};
 static const Board* const kBoards[] = {&kWaveshareC6, &kStopWatch};
 
 const Board* findBoard(const std::string& id) {
