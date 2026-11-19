@@ -35,6 +35,10 @@ static void roundTrip() {
     // defaults for anything missing or broken
     Settings d = parse("role=bogus\njam=abc\nperiods=99\nunknown=1\n");
     CHECK(d.role == Role::JamTimer && d.jamMs == 120000 && d.periods == 2);
+    // clock face: stored by key, unknown keys keep the default (classic)
+    Settings f;
+    f.face = 2;
+    CHECK(parse(serialize(f)).face == 2 && Settings().face == 0 && parse("face=sundial\n").face == 0);
 }
 
 static void form() {
@@ -49,6 +53,9 @@ static void form() {
     CHECK(applyForm(old, body, out) == "");
     CHECK(out.role == Role::Blockers2 && out.swapButtons[2] && !out.swapButtons[0]);
     CHECK(out.sleepMinutes == 5);
+    CHECK(out.face == 0); // no face field: unchanged
+    Settings lcd;
+    CHECK(applyForm(old, body + "&face=lcd-colour", lcd) == "" && lcd.face == 3);
     CHECK(out.brightness == 60 && out.jamMs == 90000 && out.lineupMs == 30000 && out.periodMs == 900000);
     CHECK(!out.jamAutoEnd); // unchecked box
     CHECK(out.periodAfterTimeout == PeriodAfterTimeout::KeepsRunning && out.undoLevels == 2);

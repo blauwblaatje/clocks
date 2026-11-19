@@ -5,6 +5,9 @@
 
 namespace cfg {
 
+const char* const kFaceKeys[kFaces] = {"classic", "lcd-day", "lcd-night", "lcd-colour"};
+const char* const kFaceNames[kFaces] = {"Classic", "LCD day", "LCD night", "LCD night, colour"};
+
 static const char* const kRoleKeys[kRoles] = {"jt", "blockers1", "blockers2", "jammers"};
 static const char* const kRoleNames[kRoles] = {"Jam timer", "Team 1 blockers", "Team 2 blockers", "Jammers"};
 static const char* const kPat[3] = {"nextjam", "timeoutend", "running"};
@@ -115,6 +118,7 @@ std::string serialize(const Settings& s) {
     for (int r = 0; r < kRoles; r++) put(std::string("swap.") + kRoleKeys[r], s.swapButtons[r] ? "1" : "0");
     put("motor", s.motorFitted ? "1" : "0");
     put("brightness", std::to_string(s.brightness));
+    put("face", kFaceKeys[s.face]);
     put("sleepMinutes", std::to_string(s.sleepMinutes));
     put("updateUrl", s.updateUrl);
     put("jam", msToText(s.jamMs));
@@ -153,6 +157,10 @@ static void applyValue(Settings& s, const std::string& k, const std::string& v) 
             if (k.substr(5) == kRoleKeys[r]) s.swapButtons[r] = v == "1";
     } else if (k == "motor") s.motorFitted = v == "1";
     else if (k == "brightness") num(10, 100, s.brightness);
+    else if (k == "face") {
+        for (int i = 0; i < kFaces; i++)
+            if (v == kFaceKeys[i]) s.face = i;
+    }
     else if (k == "sleepMinutes") num(0, 120, s.sleepMinutes);
     // 0.1.0's default named the Waveshare's release file; now the site, so
     // each board finds its own firmware
@@ -245,6 +253,9 @@ std::string applyForm(const Settings& old, const std::string& body, Settings& ou
     for (int r = 0; r < kRoles; r++) s.swapButtons[r] = f.count(std::string("swap.") + kRoleKeys[r]) > 0;
     s.motorFitted = f.count("motor") > 0;
     num("brightness", "Brightness", 10, 100, s.brightness);
+    if (f.count("face"))
+        for (int i = 0; i < kFaces; i++)
+            if (get("face") == kFaceKeys[i]) s.face = i;
     if (f.count("sleepMinutes")) num("sleepMinutes", "Sleep after", 0, 120, s.sleepMinutes);
     if (f.count("updateUrl")) {
         s.updateUrl = get("updateUrl");
@@ -364,6 +375,11 @@ std::string page(const Settings& s, const std::string& message, const std::strin
     h += "</select></label>";
 
     h += "<h2>Device</h2>";
+    h += "<label>Clock face<select name=\"face\">";
+    for (int i = 0; i < kFaces; i++)
+        h += std::string("<option value=\"") + kFaceKeys[i] + "\"" + (s.face == i ? " selected" : "") + ">" +
+             kFaceNames[i] + "</option>";
+    h += "</select></label>";
     h += "<label>Brightness (%)<input type=\"number\" name=\"brightness\" min=\"10\" max=\"100\" value=\"" +
          std::to_string(s.brightness) + "\"></label>";
     h += "<label>Sleep after (minutes without a clock running or a press; 0 = never)"

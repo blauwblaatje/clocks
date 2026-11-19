@@ -21,12 +21,18 @@ struct Network {
 
 enum class PeriodAfterTimeout : uint8_t { NextJam, TimeoutEnd, KeepsRunning };
 
+// Clock faces (Rogier, 2026-11-19): all in the firmware, picked here.
+const int kFaces = 4;
+extern const char* const kFaceKeys[kFaces];
+extern const char* const kFaceNames[kFaces];
+
 struct Settings {
     std::vector<Network> networks; // in the order to try
     Role role = Role::JamTimer;
     bool swapButtons[kRoles] = {false, false, false, false}; // swap the 10 and 2 o'clock buttons, per role
     bool motorFitted = false;
     int brightness = 100;
+    int face = 0; // kFaceKeys: classic, LCD day, LCD night, LCD night in colour
     int sleepMinutes = 10; // sleep after this long idle (no clock, no press); 0 = never
     // Install site for the menu's Update: the device adds "<board>/latest.json"
     // (upd::releaseUrl); a .json address is used as it stands; "" = none

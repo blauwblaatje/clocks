@@ -29,6 +29,8 @@ class Host {
     // Device
     virtual int brightness() const = 0; // percent
     virtual void setBrightness(int percent) = 0;
+    virtual std::string faceName() const { return ""; } // "" = no Face row
+    virtual void nextFace() {}
     virtual bool motorFitted() const = 0;
     virtual bool vibration() const = 0;
     virtual void setVibration(bool on) = 0;

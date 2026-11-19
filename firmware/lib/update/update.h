@@ -44,6 +44,7 @@ struct Board {
     const char* crownName = nullptr;
     const char* leftName = nullptr;
     const char* rightName = nullptr;
+    int crownAt = 12, leftAt = 10, rightAt = 2; // clock hours (lib/buttons)
 };
 extern const Board kWaveshareC6, kStopWatch;
 const Board* findBoard(const std::string& id); // nullptr = unknown

@@ -4,6 +4,7 @@
 #include "boxcore.h"
 #include "jamcore.h"
 #include "buttons.h"
+#include "lcdui.h"
 #include "scale.h"
 
 using ui::px;
@@ -16,15 +17,29 @@ struct JtApp : App {
     jamcore::JamTimer local;
     jt::Controller ctl;
     jt::Ui ui;
+    std::unique_ptr<lcd::JtFace> face; // over the classic screen (lcdui.h)
+    jt::Fonts fonts;
     JtApp(lv_obj_t* scr, crg::Client* c, bool conn, const jt::Fonts& f, const jamcore::Config& cfg)
-        : local(cfg), ctl(local, c, conn ? jt::Mode::Connected : jt::Mode::Standalone), ui(scr, f) {}
-    ~JtApp() override { lv_obj_delete(ui.root()); }
+        : local(cfg), ctl(local, c, conn ? jt::Mode::Connected : jt::Mode::Standalone), ui(scr, f), fonts(f) {}
+    ~JtApp() override {
+        face.reset();
+        lv_obj_delete(ui.root());
+    }
+    void setFace(int i) override {
+        face.reset();
+        // beside the classic screen, not in it (box::Ui rebuilds its children)
+        if (i > 0) face.reset(new lcd::JtFace(lv_obj_get_parent(ui.root()), fonts, (lcd::Palette)i));
+    }
     void button(Phys b, bool down, uint32_t now) override {
         ctl.button(b == Phys::Crown ? jt::Btn::Crown : b == Phys::Right ? jt::Btn::Timeout : jt::Btn::Undo, down, now);
     }
     void touch(int x, int y, uint32_t now) override { ctl.touch(x, y, now); }
     void tick(uint32_t now) override { ctl.tick(now); }
-    void show(uint32_t now) override { ui.show(ctl.view(now), now); }
+    void show(uint32_t now) override {
+        jt::View v = ctl.view(now);
+        ui.show(v, now);
+        if (face) face->show(v, now);
+    }
     lv_obj_t* root() override { return ui.root(); }
     bool takeMenuRequest() override { return ctl.takeMenuRequest(); }
     bool idle(uint32_t) override { return ctl.idle(); }
@@ -37,15 +52,28 @@ struct BoxApp : App {
     boxcore::BoxTimer local;
     box::Controller ctl;
     box::Ui ui;
+    std::unique_ptr<lcd::BoxFace> face;
+    jt::Fonts fonts;
     BoxApp(lv_obj_t* scr, box::Role r, int team, crg::Client* c, bool conn, const jt::Fonts& f)
-        : ctl(r, team, local, c, conn ? box::Mode::Connected : box::Mode::Standalone), ui(scr, f) {}
-    ~BoxApp() override { lv_obj_delete(ui.root()); }
+        : ctl(r, team, local, c, conn ? box::Mode::Connected : box::Mode::Standalone), ui(scr, f), fonts(f) {}
+    ~BoxApp() override {
+        face.reset();
+        lv_obj_delete(ui.root());
+    }
+    void setFace(int i) override {
+        face.reset();
+        if (i > 0) face.reset(new lcd::BoxFace(lv_obj_get_parent(ui.root()), fonts, (lcd::Palette)i));
+    }
     void button(Phys b, bool down, uint32_t now) override {
         ctl.button(b == Phys::Crown ? box::Btn::Crown : b == Phys::Left ? box::Btn::Left : box::Btn::Right, down, now);
     }
     void touch(int x, int y, uint32_t now) override { ctl.touch(x, y, now); }
     void tick(uint32_t now) override { ctl.tick(now); }
-    void show(uint32_t now) override { ui.show(ctl.view(now), now); }
+    void show(uint32_t now) override {
+        box::View v = ctl.view(now);
+        ui.show(v, now);
+        if (face) face->show(v, now);
+    }
     lv_obj_t* root() override { return ui.root(); }
     bool takeMenuRequest() override { return ctl.takeMenuRequest(); }
     bool idle(uint32_t now) override { return ctl.canSwap(now); }
@@ -328,6 +356,10 @@ void Device::applySettings(const cfg::Settings& s, std::string& note) {
     settings_ = s;
     p_.saveSettings(cfg::serialize(s));
     setBrightness(s.brightness);
+    if (old.face != s.face) {
+        app_->setFace(s.face);
+        raiseOverlays();
+    }
     bool netsChanged = old.networks.size() != s.networks.size();
     for (size_t n = 0; !netsChanged && n < s.networks.size(); n++) {
         const cfg::Network &a = old.networks[n], &b = s.networks[n];
@@ -495,7 +527,8 @@ void Device::loop() {
 void Device::setButtonNames() {
     const upd::Board& bd = p_.board();
     bool sw = settings_.swapButtons[(int)role_];
-    btn::gNames = {bd.crownName, sw ? bd.rightName : bd.leftName, sw ? bd.leftName : bd.rightName};
+    btn::gNames = {bd.crownName, sw ? bd.rightName : bd.leftName, sw ? bd.leftName : bd.rightName,
+                   bd.crownAt,   sw ? bd.rightAt : bd.leftAt,     sw ? bd.leftAt : bd.rightAt};
 }
 
 void Device::start(bool connected) {
@@ -519,6 +552,15 @@ void Device::start(bool connected) {
     default:
         app_ = new BoxApp(screen_, box::Role::Blockers, role_ == menu::RoleId::Blockers2 ? 2 : 1, cp, connected, fonts_);
     }
+    app_->setFace(settings_.face);
+    raiseOverlays();
+}
+
+// Menu, setup and update screens stay above the app and its face.
+void Device::raiseOverlays() {
+    if (menuUi_) lv_obj_move_foreground(menuUi_->root());
+    if (setupRoot_) lv_obj_move_foreground(setupRoot_);
+    if (updateRoot_) lv_obj_move_foreground(updateRoot_);
 }
 
 void Device::pump(uint32_t now) {
@@ -603,6 +645,14 @@ menu::Refusal Device::resetGame() {
 menu::Refusal Device::clearClocks() {
     app_->clearClocks();
     return "";
+}
+
+// Menu > Device > Face: the next face, at once (no restart).
+void Device::nextFace() {
+    settings_.face = (settings_.face + 1) % cfg::kFaces;
+    p_.saveSettings(cfg::serialize(settings_));
+    app_->setFace(settings_.face);
+    raiseOverlays();
 }
 
 void Device::setBrightness(int pct) {
