@@ -9,7 +9,8 @@ install) and `latest.json` (`version`, `app`, `size`, `sha256`). A device's
 release address is the site; it adds `<board id>/latest.json` and checks
 version, size, image header (chip), board marker and SHA-256.
 
-- `index.html`: ESP Web Tools install button (first install and USB reflash,
+- `index.html`: release notes (add the next release there before tagging),
+  ESP Web Tools install button (first install and USB reflash,
   Chrome or Edge), links to each board's `firmware.bin`.
 - `manifest.json`: ESP Web Tools, one build per chip (ESP32-C6, ESP32-S3);
   the page installs the one for the chip it finds.

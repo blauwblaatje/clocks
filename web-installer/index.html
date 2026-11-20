@@ -5,7 +5,7 @@
 <script type="module" src="https://unpkg.com/esp-web-tools@10.0.1/dist/web/install-button.js?module"></script>
 <style>
 body{font-family:system-ui,sans-serif;margin:0 auto;max-width:560px;padding:12px 16px;background:#111;color:#eee}
-h1{font-size:1.3em}h2{font-size:1.05em;margin-top:1.6em;border-bottom:1px solid #444}
+h1{font-size:1.3em}h2{font-size:1.05em;margin-top:1.6em;border-bottom:1px solid #444}h3{font-size:1em;margin:1.2em 0 .3em}li{margin:.25em 0}
 a{color:#6fb6ff}code{background:#222;padding:1px 4px;border-radius:3px}small{color:#aaa}
 esp-web-install-button button{padding:10px 18px;font-size:1em}
 </style></head><body>
@@ -32,6 +32,54 @@ setup page:</p>
 <p>A timer refuses firmware made for the other board.</p>
 <p><small>For the timers: <code>&lt;board&gt;/latest.json</code> holds the version, size and SHA-256 of
 that board's <code>firmware.bin</code>.</small></p>
+
+<h2 id="releases">Release notes</h2>
+<!-- Newest first. Add the next release here before tagging it. -->
+<h3>0.3.1 <small>2026-11-20</small></h3>
+<ul>
+<li>Release notes on this page. The firmware is the same as 0.3.0.</li>
+</ul>
+<h3>0.3.0 <small>2026-11-20</small></h3>
+<ul>
+<li>Clock faces: pick how the main screen looks. Besides Classic there are LCD (day, night,
+night in colour), Big, Big outline, Rings, Chronograph, High contrast, Flip and Nixie, for the
+jam timer and both box timer roles, on both boards. Menu, Device, Face or the setup page; the
+face changes at once.</li>
+<li>Each role keeps its own face. Prefer Big as jam timer and Rings in the box? Switching role
+brings the face along.</li>
+<li>Each role keeps its own buttons too: put any of the role's three actions on any button
+(menu, Device, Buttons or the setup page). Undo and the hold for the menu stay together on one
+button. Settings from 0.2 carry over.</li>
+<li>Team colours (setup page): the box timer faces show the team colours set in CRG as an edge
+and on the team names.</li>
+<li>Faces with little room show what each button does while you hold a button and for 3 seconds
+after a press. On the Waveshare, whose buttons sit at the top, every face does this.</li>
+</ul>
+<h3>0.2.1 <small>2026-11-19</small></h3>
+<ul>
+<li>M5Stack StopWatch: yellow (11 o'clock) is the main button, blue (1 o'clock) and red (7
+o'clock) the other two. Screens name the buttons by their colour.</li>
+<li>Fixed: the StopWatch crashed on its first connection to a real CRG (also in 0.2.0).</li>
+<li>Fixed: touch on the StopWatch.</li>
+<li>The setup page stays on as long as the timer is on a network; Info shows its IP address.</li>
+<li>The menu opens during intermission. Role changes, updates and automatic sleep still wait for
+the intermission clock to stop.</li>
+<li>Clock digits keep the same width, so times no longer shift as they count.</li>
+<li>Screens redraw faster (a full StopWatch screen in 185 ms instead of 310 ms).</li>
+</ul>
+<h3>0.2.0 <small>2026-11-18</small></h3>
+<ul>
+<li>A second board: the M5Stack StopWatch (ESP32-S3, 466 × 466 AMOLED), with its own firmware.</li>
+<li>Updates come from this site, one folder per board. A timer refuses firmware made for the
+other board, also when uploaded on its setup page.</li>
+<li>This page installs the right firmware for the chip it finds.</li>
+</ul>
+<h3>0.1.0 <small>2026-11-13</small></h3>
+<ul>
+<li>First release: jam timer and penalty box timers for the Waveshare ESP32-C6-Touch-LCD-1.28,
+controlling CRG over the network or running on their own.</li>
+<li>Install over USB from this page, updates over Wi-Fi.</li>
+</ul>
 <script>
 fetch("waveshare-c6/latest.json").then(r => r.json()).then(j => { document.getElementById("version").textContent = j.version; });
 </script>
