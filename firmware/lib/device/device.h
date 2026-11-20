@@ -80,7 +80,7 @@ struct App {
     virtual bool connected() const = 0;
     virtual void setConnected(bool c) = 0;
     // Menu actions; the firmware has no RTTI, so no dynamic_cast.
-    virtual void setFace(int) {} // cfg::kFaceKeys index; 0 = classic
+    virtual void setFace(int, bool) {} // cfg::kFaceKeys index (0 = classic), team colours
     virtual bool sidesSwapped() const { return false; }
     virtual bool requestSwap(uint32_t) { return true; }
     virtual void resetGame() {}
@@ -110,8 +110,10 @@ class Device : public menu::Host {
     menu::Refusal clearClocks() override;
     int brightness() const override { return brightness_; }
     void setBrightness(int p) override;
-    std::string faceName() const override { return cfg::kFaceNames[settings_.face]; }
+    std::string faceName() const override { return cfg::kFaceNames[settings_.faces[(int)role_]]; }
     void nextFace() override;
+    std::string buttonsName() const override;
+    menu::Refusal nextButtons() override;
     bool motorFitted() const override { return settings_.motorFitted; }
     bool vibration() const override { return false; }
     void setVibration(bool) override {}
@@ -135,6 +137,9 @@ class Device : public menu::Host {
     void updateTouch(int x, int y, uint32_t now);
     void start(bool connected);
     void setButtonNames();
+    Phys logical(Phys b) const; // this role's button mapping
+    cfg::ButtonNames physicalNames() const;
+    void restartApp(bool connected);
     void raiseOverlays();
     bool serveWeb(int port, std::string& err);
     void buildSetupScreen(const Platform::SetupInfo& info);

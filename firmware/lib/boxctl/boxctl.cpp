@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "boxctl.h"
 #include "buttons.h"
 #include <algorithm>
@@ -34,6 +35,17 @@ Controller::Controller(Role role, int team, boxcore::BoxTimer& local, crg::Clien
 
 int Controller::team() const { return swap_ ? 3 - team_ : team_; }
 int Controller::teamOfSide(int side) const { return (side == 0) != swap_ ? 1 : 2; }
+
+// "#rrggbb" (CRG's colour pickers) -> 0xrrggbb; -1 when unset or not a colour.
+int32_t teamColour(const crg::TeamState& t) {
+    for (const std::string* c : {&t.colourScoreboard, &t.colourOverlay}) {
+        if (c->size() != 7 || (*c)[0] != '#') continue;
+        char* end = nullptr;
+        long n = strtol(c->c_str() + 1, &end, 16);
+        if (end && *end == 0) return (int32_t)n;
+    }
+    return -1;
+}
 
 bool Controller::online() const {
     return mode_ == Mode::Connected && client_ && client_->connected() && client_->synced();
@@ -584,10 +596,13 @@ View Controller::view(uint32_t now) const {
             const crg::GameState& g = client_->game();
             if (!g.team[teamOfSide(0) - 1].name.empty()) v.teamLeft = g.team[teamOfSide(0) - 1].name;
             if (!g.team[teamOfSide(1) - 1].name.empty()) v.teamRight = g.team[teamOfSide(1) - 1].name;
+            v.colourLeft = teamColour(g.team[teamOfSide(0) - 1]);
+            v.colourRight = teamColour(g.team[teamOfSide(1) - 1]);
         }
         v.hint = conn ? btn::crown() + " held: undo" : btn::crown() + ": pause, held: undo";
     } else {
         v.hint = btn::crown() + ": sat down\n" + btn::right() + (conn ? ": release" : ": pause");
+        if (conn) v.colourTeam = teamColour(client_->game().team[team() - 1]);
     }
     if (conn) {
         if (lastOutcome_ == Outcome::Pending && pressId_ != 0) {

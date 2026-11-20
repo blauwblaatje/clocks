@@ -26,6 +26,9 @@ struct View {
     Tone tone = Tone::Idle;
     int ringPermille = 0; // 0..1000, ring progress
     bool ringOn = true;   // false during the off phase of the five-second flash
+    long long ringTotalMs = 0; // the full time ringPermille is a part of (faces mark their dials with it)
+    bool ringCountsUp = false; // the clock counts up (lineup, timeout): ringPermille is time used, not time left
+    int periodPermille = -1;   // period clock left, 0..1000; -1 = not known
     std::string period;   // "Period 24:10" (" stopped" in a timeout)
     std::string hint;     // "Crown: Stop Jam"
     bool hintDim = false; // crown blocked for 1 s after a press

@@ -10,14 +10,43 @@
 // changes (lvset.h).
 #pragma once
 #include <stdint.h>
+#include <memory>
 #include <string>
 
 #include "boxctl.h"
+#include "facekit.h"
 #include "jtctl.h"
 #include "jtui.h"
 #include "lvgl.h"
 
 namespace lcd {
+
+struct Options {
+    bool teamColours = false; // CRG's team colours on the box timer faces
+};
+
+// A face over the classic screen (see above). The device hands it each new
+// view and tells it about button presses (some faces show their legends
+// only for a while after a press).
+class Face {
+  public:
+    virtual ~Face() {}
+    virtual void show(const jt::View&, uint32_t) {}
+    virtual void show(const box::View&, uint32_t) {}
+    void pressed(uint32_t now) { pressedAt_ = now ? now : 1; }
+
+  protected:
+    // legends of the press-to-see faces: while a hold runs and 3 s after a press
+    bool legendsDue(uint32_t now, int holdPermille) const {
+        return holdPermille > 0 || (pressedAt_ && now - pressedAt_ < 3000);
+    }
+    uint32_t pressedAt_ = 0;
+};
+
+// cfg::Settings face index (kFaceKeys) -> the face for the jam timer or a
+// box timer role; nullptr for 0 (classic).
+std::unique_ptr<Face> makeJtFace(int face, lv_obj_t* parent, const jt::Fonts& f, const Options& o);
+std::unique_ptr<Face> makeBoxFace(int face, lv_obj_t* parent, const jt::Fonts& f, const Options& o);
 
 // Face setting values beyond 0 (classic); cfg::Settings::face.
 enum class Palette : uint8_t { Day = 1, Night = 2, NightColour = 3 };
@@ -64,27 +93,15 @@ class Rim {
     bool on_ = true;
 };
 
-// The legends next to the buttons: a dot in the button's colour and what the
-// button does now. Positions and colours come from the board (lib/buttons).
-class Legends {
-  public:
-    Legends(lv_obj_t* parent, const jt::Fonts& f, const Colours& c);
-    // crown, left (10 o'clock button), right (2 o'clock button)
-    void set(const std::string& crown, const std::string& left, const std::string& right);
+using kit::Legends;
+using kit::hintActions;
+using kit::upper;
 
-  private:
-    lv_obj_t* label_[3];
-};
-
-// What the hint says each button does: "Yellow: Stop Jam · Red: Lineup".
-void hintActions(const std::string& hint, std::string& crown, std::string& left, std::string& right);
-std::string upper(const std::string& s);
-
-class JtFace {
+class JtFace : public Face {
   public:
     JtFace(lv_obj_t* parent, const jt::Fonts& f, Palette p);
-    ~JtFace();
-    void show(const jt::View& v, uint32_t now);
+    ~JtFace() override;
+    void show(const jt::View& v, uint32_t now) override;
 
   private:
     Colours c_;
@@ -96,11 +113,11 @@ class JtFace {
     Digits *period_, *main_, *jamNo_;
 };
 
-class BoxFace {
+class BoxFace : public Face {
   public:
-    BoxFace(lv_obj_t* parent, const jt::Fonts& f, Palette p);
-    ~BoxFace();
-    void show(const box::View& v, uint32_t now);
+    BoxFace(lv_obj_t* parent, const jt::Fonts& f, Palette p, const Options& o);
+    ~BoxFace() override;
+    void show(const box::View& v, uint32_t now) override;
 
   private:
     struct Row {
@@ -113,7 +130,9 @@ class BoxFace {
     };
     Colours c_;
     jt::Fonts f_;
+    Options o_;
     lv_obj_t *root_, *status_, *hold_, *divider_;
+    kit::Ring *edgeL_, *edgeR_; // team colours
     Rim* rim_;
     Legends* legends_;
     Row rows_[3];

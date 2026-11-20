@@ -19,7 +19,9 @@ static bool has(const std::string& s, const std::string& p) { return s.find(p) !
 static void roundTrip() {
     Settings s;
     s.role = Role::Jammers;
-    s.swapButtons[1] = true;
+    s.buttons[1] = "rcl";
+    s.faces[3] = 6;
+    s.teamColours = true;
     s.jamMs = 90000;
     s.periodAfterTimeout = PeriodAfterTimeout::TimeoutEnd;
     s.undoLevels = 3;
@@ -27,7 +29,8 @@ static void roundTrip() {
     s.networks.push_back({"Sporthal = Zuid", "p@ss\nword\\", "192.168.1.10", 8000});
     s.networks.push_back({"Home", "x", "crg.local", 8080});
     Settings t = parse(serialize(s));
-    CHECK(t.role == Role::Jammers && t.swapButtons[1] && !t.swapButtons[0]);
+    CHECK(t.role == Role::Jammers && t.buttons[1] == "rcl" && t.buttons[0] == "clr");
+    CHECK(t.faces[3] == 6 && t.faces[0] == 0 && t.teamColours && !Settings().teamColours);
     CHECK(t.jamMs == 90000 && t.periodAfterTimeout == PeriodAfterTimeout::TimeoutEnd && t.undoLevels == 3);
     CHECK(t.sleepMinutes == 0 && Settings().sleepMinutes == 10);
     CHECK(t.networks.size() == 2 && t.networks[0].ssid == "Sporthal = Zuid" && t.networks[0].password == "p@ss\nword\\");
@@ -37,25 +40,38 @@ static void roundTrip() {
     CHECK(d.role == Role::JamTimer && d.jamMs == 120000 && d.periods == 2);
     // clock face: stored by key, unknown keys keep the default (classic)
     Settings f;
-    f.face = 2;
-    CHECK(parse(serialize(f)).face == 2 && Settings().face == 0 && parse("face=sundial\n").face == 0);
+    f.faces[0] = 2;
+    f.faces[2] = 10;
+    Settings g = parse(serialize(f));
+    CHECK(g.faces[0] == 2 && g.faces[2] == 10 && g.faces[1] == 0 && Settings().faces[0] == 0);
+    CHECK(parse("face.jt=sundial\n").faces[0] == 0 && parse("buttons.jt=ccc\n").buttons[0] == "clr");
+    // up to 0.2: one face for every role, and a swap of the side buttons
+    Settings old = parse("face=lcd-night\nswap.blockers1=1\nswap.jt=0\n");
+    CHECK(old.faces[0] == 2 && old.faces[3] == 2 && old.buttons[1] == "crl" && old.buttons[0] == "clr");
+    // a per-role key after the old one wins
+    CHECK(parse("face=big\nface.jammers=nixie\n").faces[3] == 10 && parse("face=big\nface.jammers=nixie\n").faces[1] == 4);
+    CHECK(validButtons("lrc") && !validButtons("lr") && !validButtons("llr"));
+    ButtonNames n;
+    n.crown = "Yellow";
+    CHECK(buttonsText(Role::JamTimer, "lcr", n) == "10 o'clock: start/stop jam \xc2\xb7 Yellow: undo, hold: menu \xc2\xb7 2 o'clock: timeout");
 }
 
 static void form() {
     Settings old;
     old.networks.push_back({"Home", "secret", "192.168.1.5", 8000});
-    std::string body = "role=blockers2&swap.blockers2=on&brightness=60&sleepMinutes=5&jam=1%3A30&lineup=30&timeout=1%3A00"
+    std::string body = "role=blockers2&buttons.blockers2=crl&brightness=60&sleepMinutes=5&jam=1%3A30&lineup=30&timeout=1%3A00"
                        "&period=15%3A00&periods=2&periodAfterTimeout=running&undoLevels=2"
                        "&net0.ssid=Home&net0.password=&net0.host=192.168.1.5&net0.port=8000"
                        "&net1.ssid=Sporthal+Zuid&net1.password=a%26b&net1.host=10.0.0.2&net1.port="
                        "&net2.ssid=&net2.host=";
     Settings out;
     CHECK(applyForm(old, body, out) == "");
-    CHECK(out.role == Role::Blockers2 && out.swapButtons[2] && !out.swapButtons[0]);
+    CHECK(out.role == Role::Blockers2 && out.buttons[2] == "crl" && out.buttons[0] == "clr");
     CHECK(out.sleepMinutes == 5);
-    CHECK(out.face == 0); // no face field: unchanged
+    CHECK(out.faces[0] == 0 && !out.teamColours); // no face field: unchanged; unchecked box
     Settings lcd;
-    CHECK(applyForm(old, body + "&face=lcd-colour", lcd) == "" && lcd.face == 3);
+    CHECK(applyForm(old, body + "&face.jammers=lcd-colour&face.jt=rings&teamColours=on&buttons.jt=bad", lcd) == "");
+    CHECK(lcd.faces[3] == 3 && lcd.faces[0] == 6 && lcd.teamColours && lcd.buttons[0] == "clr");
     CHECK(out.brightness == 60 && out.jamMs == 90000 && out.lineupMs == 30000 && out.periodMs == 900000);
     CHECK(!out.jamAutoEnd); // unchecked box
     CHECK(out.periodAfterTimeout == PeriodAfterTimeout::KeepsRunning && out.undoLevels == 2);

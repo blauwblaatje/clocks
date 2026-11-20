@@ -583,3 +583,28 @@ Built (choices made while building, for Rogier to check):
   charging is shown.
 - Not built: the vibration motor (as on the Waveshare, the cues are still
   missing), the CST9217 touch variant some units have.
+
+## 2026-11-20: clock faces, face and buttons per role
+
+Designs on the canvas "CLOCK faces"; Rogier picked all of them to build
+(2026-11-20) and asked for both boards at once.
+- Faces: Classic, LCD (day, night, night in colour), Big, Big outline,
+  Rings, Chronograph, High contrast, Flip, Nixie. One firmware, chosen in
+  menu > Device > Face or on the setup page.
+- Per role (Rogier: "I only need to switch role, not face"): each role keeps
+  its own face and its own buttons. Settings `face.<role>` and
+  `buttons.<role>`; 0.2's `face` (all roles) and `swap.<role>` are still
+  read.
+- Buttons per role: any of the role's three actions on any button (six
+  mappings, setup page and menu > Device > Buttons). Undo and the menu
+  hold stay one action, so every mapping keeps the menu reachable. Screen
+  texts name the button that does it.
+- Team colours: an option (setup page). The box timer faces draw CRG's
+  `Team(n).Color(scoreboard.bg)` (else `overlay.bg`) as an edge round the
+  disc and on the team names. High contrast stays black and white.
+- Digits of the new faces are strokes (lines and round arcs), not fonts:
+  any size, narrow enough for the round screen, no flash.
+- Big, Rings and Chronograph show the button legends only during a hold
+  and 3 s after a press. On the Waveshare (buttons at 12, 10 and 2
+  o'clock) every face does that, on plates, because the legends would sit
+  on the faces' top rows.

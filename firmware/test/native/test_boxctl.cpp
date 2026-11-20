@@ -345,7 +345,20 @@ static void colourNames() {
     CHECK(k.view(0).hint == "Crown: sat down\n2 o'clock: pause");
 }
 
+// Team colours (faces' option): CRG's "#rrggbb", scoreboard first.
+static void teamColours() {
+    crg::TeamState t;
+    CHECK(box::teamColour(t) == -1);
+    t.colourOverlay = "#00ff80";
+    CHECK(box::teamColour(t) == 0x00ff80);
+    t.colourScoreboard = "#FF0000";
+    CHECK(box::teamColour(t) == 0xff0000);
+    t.colourScoreboard = "red";
+    CHECK(box::teamColour(t) == 0x00ff80);
+}
+
 int main() {
+    teamColours();
     releaseButton();
     colourNames();
     menuHoldAndSwapPrompt();

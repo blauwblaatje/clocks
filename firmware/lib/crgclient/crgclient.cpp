@@ -172,7 +172,7 @@ void Client::sendRegister() {
         "Clock(*).Time", "Clock(*).Running", "Clock(*).Direction", "Clock(*).Number", "Clock(*).MaximumTime",
         "InJam", "InPeriod", "NoMoreJam", "OfficialScore", "TimeoutOwner", "OfficialReview", "FiveSeconds",
         "Label(*)", "Team(*).Id", "Team(*).Name", "Team(*).Timeouts", "Team(*).OfficialReviews",
-        "Team(*).StarPass", "Rule(Period.Number)",
+        "Team(*).StarPass", "Team(*).Color(*)", "Rule(Period.Number)",
     };
     static const char* const posProps[] = {"Skater", "RosterNumber", "CurrentFielding",
                                            "PenaltyBox", "HasUnserved", "PenaltyTime"};
@@ -367,6 +367,11 @@ void Client::applyGame(const std::string& k, const JsonValue& v, uint32_t now) {
                 else if (prop == "HasUnserved") ps.hasUnserved = v.asBool();
                 else if (prop == "PenaltyTime") ps.penaltyTimeMs = v.asInt();
             }
+            return;
+        }
+        if (takeId(k, i, "Color", id)) {
+            if (id == "scoreboard.bg") ts.colourScoreboard = v.text();
+            else if (id == "overlay.bg") ts.colourOverlay = v.text();
             return;
         }
         std::string prop = k.substr(i);

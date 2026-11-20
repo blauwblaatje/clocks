@@ -78,6 +78,7 @@ std::vector<Row> Menu::rowsOf(Page p) const {
     case Page::Device:
         r.push_back({"Brightness", std::to_string(h_.brightness()) + "%"});
         if (!h_.faceName().empty()) r.push_back({"Face", h_.faceName()});
+        if (!h_.buttonsName().empty()) r.push_back({"Buttons", h_.buttonsName()});
         if (h_.motorFitted()) r.push_back({"Vibration", h_.vibration() ? "on" : "off"});
         break;
     case Page::Connection: {
@@ -121,6 +122,7 @@ void Menu::activate(Page p, int row, uint32_t now) {
     case Page::Device:
         if (label == "Brightness") h_.setBrightness(h_.brightness() >= 100 ? 25 : h_.brightness() + 25);
         else if (label == "Face") h_.nextFace();
+        else if (label == "Buttons") result(h_.nextButtons(), now);
         else if (label == "Vibration") h_.setVibration(!h_.vibration());
         break;
     case Page::Connection:

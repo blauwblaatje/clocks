@@ -31,6 +31,8 @@ class Host {
     virtual void setBrightness(int percent) = 0;
     virtual std::string faceName() const { return ""; } // "" = no Face row
     virtual void nextFace() {}
+    virtual std::string buttonsName() const { return ""; } // "" = no Buttons row
+    virtual Refusal nextButtons() { return ""; }           // this role's next button mapping
     virtual bool motorFitted() const = 0;
     virtual bool vibration() const = 0;
     virtual void setVibration(bool on) = 0;

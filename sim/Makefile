@@ -18,7 +18,7 @@ LV_SRC := $(shell find $(LVGL)/src -name '*.c')
 LV_OBJ := $(patsubst %.c,$(BUILD)/%.o,$(LV_SRC))
 APP_SRC := main.cpp $(FW)/wsposix/wsposix.cpp $(FW)/device/device.cpp $(FW)/jamcore/jamcore.cpp $(FW)/crgclient/crgclient.cpp $(FW)/crgclient/crgjson.cpp \
            $(FW)/jtctl/jtctl.cpp $(FW)/jtui/jtui.cpp $(FW)/boxcore/boxcore.cpp $(FW)/boxctl/boxctl.cpp \
-           $(FW)/boxui/boxui.cpp $(FW)/lcdui/lcdui.cpp $(FW)/devmenu/devmenu.cpp $(FW)/devmenuui/devmenuui.cpp \
+           $(FW)/boxui/boxui.cpp $(FW)/lcdui/lcdui.cpp $(FW)/lcdui/facekit.cpp $(FW)/lcdui/faces.cpp $(FW)/devmenu/devmenu.cpp $(FW)/devmenuui/devmenuui.cpp \
            $(FW)/settings/settings.cpp $(FW)/httpmini/httpmini.cpp \
            $(FW)/update/update.cpp $(FW)/update/sha256.cpp $(FW)/update/httpget.cpp
 APP_OBJ := $(patsubst %.cpp,$(BUILD)/app/%.o,$(notdir $(APP_SRC)))

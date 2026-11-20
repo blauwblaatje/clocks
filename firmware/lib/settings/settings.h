@@ -21,18 +21,26 @@ struct Network {
 
 enum class PeriodAfterTimeout : uint8_t { NextJam, TimeoutEnd, KeepsRunning };
 
-// Clock faces (Rogier, 2026-11-19): all in the firmware, picked here.
-const int kFaces = 4;
+// Clock faces (Rogier, 2026-11-19): all in the firmware, picked here, one
+// per role (2026-11-20: "I only need to switch role, not face").
+const int kFaces = 11;
 extern const char* const kFaceKeys[kFaces];
 extern const char* const kFaceNames[kFaces];
 
 struct Settings {
     std::vector<Network> networks; // in the order to try
     Role role = Role::JamTimer;
-    bool swapButtons[kRoles] = {false, false, false, false}; // swap the 10 and 2 o'clock buttons, per role
+    // Which button does what, per role (2026-11-20): for the role's three
+    // actions in order (the crown's, the 10 o'clock button's: undo and the
+    // menu hold, the 2 o'clock button's; jammers: undo, left, right) the
+    // physical button: 'c' crown, 'l' left (10 o'clock; StopWatch red),
+    // 'r' right (2 o'clock; StopWatch blue). "clr" = as printed. Undo and the
+    // menu hold stay one action, so every mapping keeps the menu reachable.
+    std::string buttons[kRoles] = {"clr", "clr", "clr", "clr"};
     bool motorFitted = false;
     int brightness = 100;
-    int face = 0; // kFaceKeys: classic, LCD day, LCD night, LCD night in colour
+    int faces[kRoles] = {0, 0, 0, 0}; // kFaceKeys, per role
+    bool teamColours = false;         // faces draw CRG's team colours (box timer roles)
     int sleepMinutes = 10; // sleep after this long idle (no clock, no press); 0 = never
     // Install site for the menu's Update: the device adds "<board>/latest.json"
     // (upd::releaseUrl); a .json address is used as it stands; "" = none
@@ -46,6 +54,16 @@ struct Settings {
 };
 
 const char* roleKey(Role r); // "jt", "blockers1", "blockers2", "jammers"
+const char* roleName(Role r); // "Jam timer", ...
+bool validButtons(const std::string& m); // a permutation of "clr"
+// The role's three actions, for the setup page and the menu.
+const char* actionName(Role r, int slot);
+
+// Names of the physical buttons on this board, for the setup page.
+struct ButtonNames {
+    std::string crown = "Crown", left = "10 o'clock", right = "2 o'clock";
+};
+std::string buttonsText(Role r, const std::string& m, const ButtonNames& n); // "Yellow: start/stop jam · Red: ..."
 
 // Storage: one "key=value" line per setting, values escaped (\n, \\).
 std::string serialize(const Settings& s);
@@ -55,7 +73,8 @@ Settings parse(const std::string& text); // unknown keys are ignored, bad values
 // (application/x-www-form-urlencoded). A blank password keeps the saved one.
 // firmware: the running version; when set, the page also offers a
 // firmware.bin upload (POST /update, raw body).
-std::string page(const Settings& s, const std::string& message, const std::string& firmware = "");
+std::string page(const Settings& s, const std::string& message, const std::string& firmware = "",
+                 const ButtonNames& names = ButtonNames());
 // Returns "" when valid (out is then the new settings), else what is wrong.
 std::string applyForm(const Settings& old, const std::string& body, Settings& out);
 

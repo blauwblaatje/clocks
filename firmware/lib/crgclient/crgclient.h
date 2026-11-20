@@ -42,6 +42,9 @@ struct PositionState {
 struct TeamState {
     std::string id; // "<game id>_<n>", compare with TimeoutOwner
     std::string name;
+    // Team colours as CRG keeps them (Team(n).Color(<id>), "#rrggbb"); the
+    // faces' team-colour option uses scoreboard.bg, else overlay.bg.
+    std::string colourScoreboard, colourOverlay;
     int timeouts = 0;
     int officialReviews = 0;
     bool starPass = false; // after a star pass the jammer is the Pivot position

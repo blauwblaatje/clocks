@@ -15,77 +15,27 @@ using ui::px;
 
 namespace lcd {
 
+using namespace kit;
+
 namespace {
 
 const float kSlant = 0.06f; // digits lean right, as on a stopwatch LCD
-
-// State colours of the classic screens (jtui.cpp, boxui.cpp), for the night
-// palette with colour.
-const uint32_t kJam = 0x3ddc84, kLineup = 0xffb020, kTimeout = 0xd9a0ff, kInter = 0x6fb6ff, kRed = 0xff6a5e;
-const uint32_t kServing = 0xff5a4e, kStand = 0xffff00, kDone = 0x6fdf6f, kWaitingC = 0xb05050, kPausedC = 0x8f8f8f;
-
-lv_obj_t* plain(lv_obj_t* parent) {
-    lv_obj_t* o = lv_obj_create(parent);
-    lv_obj_remove_style_all(o);
-    lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_remove_flag(o, LV_OBJ_FLAG_CLICKABLE);
-    return o;
-}
-
-lv_obj_t* text(lv_obj_t* parent, const lv_font_t* f, lv_color_t c) {
-    lv_obj_t* l = lv_label_create(parent);
-    lv_obj_set_style_text_font(l, f, 0);
-    lv_obj_set_style_text_color(l, c, 0);
-    lv_obj_remove_flag(l, LV_OBJ_FLAG_CLICKABLE);
-    return l;
-}
-
-void setText(lv_obj_t* l, const std::string& s) {
-    const char* t = lv_label_get_text(l);
-    if (!t || s != t) lv_label_set_text(l, s.c_str());
-}
-
-lv_obj_t* row(lv_obj_t* parent, int gap, lv_flex_align_t cross) {
-    lv_obj_t* r = plain(parent);
-    lv_obj_set_size(r, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(r, LV_FLEX_ALIGN_CENTER, cross, cross);
-    lv_obj_set_style_pad_column(r, px(gap), 0);
-    return r;
-}
-
-lv_obj_t* column(lv_obj_t* parent, int gap) {
-    lv_obj_t* r = plain(parent);
-    lv_obj_set_size(r, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(r, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(r, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_row(r, px(gap), 0);
-    return r;
-}
-
-lv_obj_t* faceRoot(lv_obj_t* parent, const Colours& c) {
-    lv_obj_t* r = plain(parent);
-    lv_obj_set_size(r, px(240), px(240));
-    lv_obj_center(r);
-    lv_obj_set_style_radius(r, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_clip_corner(r, true, 0);
-    lv_obj_set_style_bg_color(r, c.bg, 0);
-    lv_obj_set_style_bg_opa(r, LV_OPA_COVER, 0);
-    return r;
-}
-
-// "1:42" -> seconds; -1 when it is not a time.
-int seconds(const std::string& clock) {
-    int m = 0, s = 0;
-    if (sscanf(clock.c_str(), "%d:%d", &m, &s) != 2) return -1;
-    return m * 60 + s;
-}
 
 // Only what the segments can show; anything else becomes a blank digit.
 std::string segText(const std::string& s) {
     std::string out;
     for (char ch : s) out += (ch >= '0' && ch <= '9') || ch == ':' || ch == '-' ? ch : ' ';
     return out;
+}
+
+LegendStyle lcdLegends(const jt::Fonts& f, const Colours& c) {
+    LegendStyle st;
+    st.font = f.b12;
+    st.text = c.label;
+    st.dotBorder = c.lit;
+    st.dotBorderWidth = c.tint || c.lit.red > 128 ? 0 : 1;
+    st.chipBg = c.bg;
+    return st;
 }
 
 } // namespace
@@ -109,13 +59,6 @@ Colours colours(Palette p) {
         c.tint = p == Palette::NightColour;
     }
     return c;
-}
-
-std::string upper(const std::string& s) {
-    std::string o = s;
-    for (char& ch : o)
-        if (ch >= 'a' && ch <= 'z') ch = (char)(ch - 'a' + 'A');
-    return o;
 }
 
 // ---------- digits ----------
@@ -320,79 +263,12 @@ void Rim::onDraw(lv_event_t* e) {
     }
 }
 
-// ---------- legends ----------
-
-Legends::Legends(lv_obj_t* parent, const jt::Fonts& f, const Colours& c) {
-    const char* names[3] = {btn::gNames.crown, btn::gNames.left, btn::gNames.right};
-    int at[3] = {btn::gNames.crownAt, btn::gNames.leftAt, btn::gNames.rightAt};
-    for (int i = 0; i < 3; i++) {
-        float a = at[i] * 30.0f * (float)M_PI / 180.0f;
-        // top half closer in, where the circle is wider: two legends fit side by side
-        float rr = cosf(a) > 0 ? px(83) : px(92);
-        int dx = (int)lroundf(rr * sinf(a)), dy = (int)lroundf(-rr * cosf(a));
-        // At 12 or 6 o'clock: centred. Elsewhere one line that starts at the
-        // rim's inner edge on the button's side and runs inward.
-        bool centre = dx >= -px(10) && dx <= px(10), rightSide = !centre && dx > 0;
-        lv_obj_t* r = row(parent, 4, LV_FLEX_ALIGN_CENTER);
-        if (rightSide) lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW_REVERSE);
-        lv_obj_t* dot = plain(r);
-        lv_obj_set_size(dot, px(7), px(7));
-        lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
-        uint32_t col = btn::colourOf(names[i]);
-        lv_obj_set_style_bg_color(dot, col ? lv_color_hex(col) : c.lit, 0);
-        lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
-        lv_obj_set_style_border_color(dot, c.lit, 0);
-        lv_obj_set_style_border_width(dot, c.tint || c.lit.red > 128 ? 0 : 1, 0);
-        label_[i] = text(r, f.b12, c.label);
-        lv_obj_set_style_text_align(label_[i], centre ? LV_TEXT_ALIGN_CENTER : rightSide ? LV_TEXT_ALIGN_RIGHT : LV_TEXT_ALIGN_LEFT, 0);
-
-        lv_label_set_text(label_[i], "");
-        // Anchored at the button, the text runs inward: left-side legends
-        // start at the dot, right-side ones end at it.
-        int half = px(120), y = half + dy - px(8);
-        int edge = (int)sqrtf((float)(px(104) * px(104) - dy * dy)); // rim's inner edge from the centre
-        if (centre) lv_obj_align(r, LV_ALIGN_TOP_MID, 0, y);
-        else if (rightSide) lv_obj_align(r, LV_ALIGN_TOP_RIGHT, -(half - edge) - px(2), y);
-        else lv_obj_align(r, LV_ALIGN_TOP_LEFT, half - edge + px(2), y);
-    }
-}
-
-// One short line each: what comes before a comma ("PAUSE, HELD: UNDO").
-void Legends::set(const std::string& crown, const std::string& left, const std::string& right) {
-    const std::string* t[3] = {&crown, &left, &right};
-    for (int i = 0; i < 3; i++) setText(label_[i], t[i]->substr(0, t[i]->find(',')));
-}
-
-void hintActions(const std::string& hint, std::string& crown, std::string& left, std::string& right) {
-    std::vector<std::string> parts;
-    std::string cur;
-    for (size_t i = 0; i < hint.size(); i++) {
-        if (hint[i] == '\n' || hint.compare(i, 4, " \xc2\xb7 ") == 0) {
-            parts.push_back(cur);
-            cur.clear();
-            if (hint[i] != '\n') i += 3;
-            continue;
-        }
-        cur += hint[i];
-    }
-    parts.push_back(cur);
-    for (auto& p : parts) {
-        size_t c = p.find(": ");
-        if (c == std::string::npos) continue;
-        std::string who = p.substr(0, c), what = upper(p.substr(c + 2));
-        if (who == btn::crown()) crown = what;
-        else if (who == btn::left() || who == btn::left("Undo")) left = what;
-        else if (who == btn::right()) right = what;
-        else if (who == "Hold") crown = upper(p); // "Hold: Extend period 1" (crown, intermission)
-    }
-}
-
 // ---------- jam timer ----------
 
 JtFace::JtFace(lv_obj_t* parent, const jt::Fonts& f, Palette p) : c_(colours(p)), f_(f) {
-    root_ = faceRoot(parent, c_);
+    root_ = faceRoot(parent, c_.bg);
     rim_ = new Rim(root_);
-    legends_ = new Legends(root_, f, c_);
+    legends_ = new Legends(root_, lcdLegends(f, c_));
 
     lv_obj_t* wr = row(root_, 6, LV_FLEX_ALIGN_CENTER);
     lv_obj_align(wr, LV_ALIGN_TOP_MID, 0, px(66));
@@ -446,7 +322,6 @@ JtFace::~JtFace() {
 }
 
 void JtFace::show(const jt::View& v, uint32_t now) {
-    (void)now;
     ui::visible(root_, v.screen == jt::Screen::Main);
     if (v.screen != jt::Screen::Main) return;
     uint32_t tone = v.tone == jt::Tone::Jam ? kJam : v.tone == jt::Tone::Lineup ? kLineup
@@ -496,27 +371,20 @@ void JtFace::show(const jt::View& v, uint32_t now) {
     std::string crown, left = "UNDO", right = "TIMEOUT";
     hintActions(v.hint, crown, left, right);
     legends_->set(crown, left, right);
+    legends_->show(!crowdedButtons() || legendsDue(now, v.holdPermille));
 }
 
 // ---------- box timer ----------
 
-namespace {
-uint32_t phaseColour(box::Phase p) {
-    switch (p) {
-    case box::Phase::Serving: return kServing;
-    case box::Phase::Stand: return kStand;
-    case box::Phase::Done: return kDone;
-    case box::Phase::Waiting: return kWaitingC;
-    case box::Phase::Paused: return kPausedC;
-    }
-    return kServing;
-}
-} // namespace
-
-BoxFace::BoxFace(lv_obj_t* parent, const jt::Fonts& f, Palette p) : c_(colours(p)), f_(f) {
-    root_ = faceRoot(parent, c_);
+BoxFace::BoxFace(lv_obj_t* parent, const jt::Fonts& f, Palette p, const Options& o) : c_(colours(p)), f_(f), o_(o) {
+    root_ = faceRoot(parent, c_.bg);
+    // team colours: a thin edge outside the rim, one half per jammer
+    edgeL_ = new Ring(root_, 118, 3);
+    edgeR_ = new Ring(root_, 118, 3);
+    edgeL_->show(false);
+    edgeR_->show(false);
     rim_ = new Rim(root_);
-    legends_ = new Legends(root_, f, c_);
+    legends_ = new Legends(root_, lcdLegends(f, c_));
     status_ = text(root_, f.b12, c_.lit);
     lv_obj_align(status_, LV_ALIGN_TOP_MID, 0, px(66));
     lv_label_set_text(status_, "");
@@ -577,6 +445,8 @@ BoxFace::BoxFace(lv_obj_t* parent, const jt::Fonts& f, Palette p) : c_(colours(p
 }
 
 BoxFace::~BoxFace() {
+    delete edgeL_;
+    delete edgeR_;
     delete rim_;
     delete legends_;
     for (auto& r : rows_) {
@@ -588,7 +458,6 @@ BoxFace::~BoxFace() {
 }
 
 void BoxFace::show(const box::View& v, uint32_t now) {
-    (void)now;
     ui::visible(root_, v.screen == box::Screen::Main);
     if (v.screen != box::Screen::Main) return;
     lv_color_t off = c_.offOf(c_.lit);
@@ -614,6 +483,8 @@ void BoxFace::show(const box::View& v, uint32_t now) {
             for (auto& sl : v.slots)
                 if (sl.side == i && !sl.key.empty()) s = &sl;
             setText(h.team, upper(i == 0 ? v.teamLeft : v.teamRight));
+            int32_t tc = i == 0 ? v.colourLeft : v.colourRight;
+            ui::textColor(h.team, o_.teamColours && tc >= 0 ? lv_color_hex(tc) : c_.label);
             lv_color_t lit = s ? litOf(s->phase) : c_.lit;
             h.time->set(s ? s->clock : " ;  ", lit, c_.ghostOf(lit));
             ui::textColor(h.stand, s && s->phase == box::Phase::Stand ? lit : off);
@@ -653,6 +524,19 @@ void BoxFace::show(const box::View& v, uint32_t now) {
     lv_obj_set_width(hold_, px(140) * v.holdPermille / 1000);
     ui::bgColor(hold_, v.holdStage ? lv_color_hex(c_.tint ? kInter : c_.lit.red > 128 ? 0xffb347 : 0x1a1f14) : c_.lit);
 
+    // Team colours: the jammers' halves, or the whole edge for one team.
+    int32_t cl = jammers ? v.colourLeft : v.colourTeam, cr = jammers ? v.colourRight : v.colourTeam;
+    edgeL_->show(o_.teamColours && cl >= 0);
+    edgeR_->show(o_.teamColours && cr >= 0);
+    if (cl >= 0) {
+        edgeL_->track(0, 0, lv_color_hex(cl));
+        edgeL_->arc(jammers ? 182 : 180, jammers ? 358 : 360, lv_color_hex(cl));
+    }
+    if (cr >= 0) {
+        edgeR_->track(0, 0, lv_color_hex(cr));
+        edgeR_->arc(jammers ? 2 : 0, jammers ? 178 : 180, lv_color_hex(cr));
+    }
+
     std::string crown, left, right;
     if (jammers) {
         crown = "HOLD: UNDO";
@@ -665,6 +549,7 @@ void BoxFace::show(const box::View& v, uint32_t now) {
     }
     hintActions(v.hint, crown, left, right);
     legends_->set(crown, left, right);
+    legends_->show(!crowdedButtons() || legendsDue(now, v.holdPermille));
 }
 
 } // namespace lcd

@@ -330,6 +330,9 @@ class Proxy:
 # runs every test on the M5Stack StopWatch's 466 x 466 screens (touch
 # positions stay in design pixels, sim --ctl scales them).
 BOARD = os.environ.get("CLOCK_SIM_BOARD", "")
+# CLOCK_SIM_FACE=big (a cfg kFaceKeys key) runs every CLOCK with that face
+# over the classic screens, and with team colours on.
+FACE = os.environ.get("CLOCK_SIM_FACE", "")
 
 
 class Clock:
@@ -337,6 +340,9 @@ class Clock:
         self.sim, self.role, self.name, self.port, self.env = sim, role, name, port, env or {}
         self.home = home or os.path.join(out, "home-" + role)
         os.makedirs(os.path.join(self.home, ".cache"), exist_ok=True)  # cookie file
+        if FACE:
+            with open(os.path.join(self.home, ".cache", "crg-sim-settings.txt"), "w") as f:
+                f.write("".join(f"face.{r}={FACE}\n" for r in ("jt", "blockers1", "blockers2", "jammers")) + "teamColours=1\n")
         self.log = []
         self.start()
 

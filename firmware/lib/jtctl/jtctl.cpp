@@ -311,6 +311,7 @@ void Controller::viewConnected(View& v, uint32_t now) const {
     std::string P = "P" + std::to_string(p) + " " + kDot + " ";
     const crg::ClockState& pc = g.clock[ClkPeriod];
     v.period = "Period " + formatClock(client_->displayMs(pc, now), true);
+    if (pc.maxMs > 0) v.periodPermille = permille(client_->displayMs(pc, now), pc.maxMs);
     CrownAction a = client_->crownAction();
     v.hint = btn::crown() + ": " + (a == CrownAction::StopJam ? g.labelStop : a == CrownAction::StartJam ? "Start Jam" : "---");
     switch (cstate()) {
@@ -322,6 +323,7 @@ void Controller::viewConnected(View& v, uint32_t now) const {
         v.state = "JAM";
         v.tone = Tone::Jam;
         v.ringPermille = permille(ms, c.maxMs > 0 ? c.maxMs : 120000);
+        v.ringTotalMs = c.maxMs > 0 ? c.maxMs : 120000;
         break;
     }
     case CState::Timeout: {
@@ -330,6 +332,8 @@ void Controller::viewConnected(View& v, uint32_t now) const {
         v.clock = formatClock(ms, false);
         v.tone = Tone::Timeout;
         v.ringPermille = permille(ms, t_.timeoutRingMs);
+        v.ringTotalMs = t_.timeoutRingMs;
+        v.ringCountsUp = true;
         const std::string& o = g.timeoutOwner;
         if (g.officialReview) v.state = "REVIEW";
         else if (o == "O") v.state = "OFFICIAL TO";
@@ -348,6 +352,7 @@ void Controller::viewConnected(View& v, uint32_t now) const {
         v.state = over ? "GAME OVER" : "INTERMISSION";
         v.tone = Tone::Intermission;
         v.ringPermille = over ? 0 : permille(client_->displayMs(ic, now), ic.maxMs);
+        v.ringTotalMs = ic.maxMs;
         if (a == CrownAction::StartJam) v.hint = crownHoldText();
         break;
     }
@@ -367,6 +372,8 @@ void Controller::viewConnected(View& v, uint32_t now) const {
             v.state = "LINEUP";
             v.tone = Tone::Lineup;
             v.ringPermille = permille(ms, t_.lineupMs);
+            v.ringTotalMs = t_.lineupMs;
+            v.ringCountsUp = true;
             if (ms >= (long long)t_.lineupMs - 5000) v.ringOn = (now / 250) % 2 == 0;
         }
         break;
@@ -392,6 +399,7 @@ void Controller::viewLocal(View& v, uint32_t now) const {
     const jamcore::Config& cfg = local_.config();
     std::string P = "P" + std::to_string(local_.period()) + " " + kDot + " ";
     v.period = "Period " + formatClock(local_.periodRemaining(now), true);
+    v.periodPermille = permille(local_.periodRemaining(now), cfg.periodMs);
     v.hint = btn::crown() + ": " + local_.crownLabel();
     switch (local_.state()) {
     case State::Jam: {
@@ -401,6 +409,7 @@ void Controller::viewLocal(View& v, uint32_t now) const {
         v.state = "JAM";
         v.tone = Tone::Jam;
         v.ringPermille = permille(ms, cfg.jamMs);
+        v.ringTotalMs = cfg.jamMs;
         break;
     }
     case State::Lineup: {
@@ -410,6 +419,8 @@ void Controller::viewLocal(View& v, uint32_t now) const {
         v.state = "LINEUP";
         v.tone = Tone::Lineup;
         v.ringPermille = permille(ms, cfg.lineupMs);
+        v.ringTotalMs = cfg.lineupMs;
+        v.ringCountsUp = true;
         if (ms + 5000 >= cfg.lineupMs) v.ringOn = (now / 250) % 2 == 0;
         break;
     }
@@ -420,6 +431,8 @@ void Controller::viewLocal(View& v, uint32_t now) const {
         v.state = "TIMEOUT";
         v.tone = Tone::Timeout;
         v.ringPermille = permille(ms, cfg.timeoutMs);
+        v.ringTotalMs = cfg.timeoutMs;
+        v.ringCountsUp = true;
         if (!local_.periodRunning()) v.period += " stopped";
         break;
     }

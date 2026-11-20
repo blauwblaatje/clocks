@@ -17,7 +17,7 @@ struct JtApp : App {
     jamcore::JamTimer local;
     jt::Controller ctl;
     jt::Ui ui;
-    std::unique_ptr<lcd::JtFace> face; // over the classic screen (lcdui.h)
+    std::unique_ptr<lcd::Face> face; // over the classic screen (lcdui.h)
     jt::Fonts fonts;
     JtApp(lv_obj_t* scr, crg::Client* c, bool conn, const jt::Fonts& f, const jamcore::Config& cfg)
         : local(cfg), ctl(local, c, conn ? jt::Mode::Connected : jt::Mode::Standalone), ui(scr, f), fonts(f) {}
@@ -25,12 +25,15 @@ struct JtApp : App {
         face.reset();
         lv_obj_delete(ui.root());
     }
-    void setFace(int i) override {
+    void setFace(int i, bool team) override {
         face.reset();
         // beside the classic screen, not in it (box::Ui rebuilds its children)
-        if (i > 0) face.reset(new lcd::JtFace(lv_obj_get_parent(ui.root()), fonts, (lcd::Palette)i));
+        lcd::Options o;
+        o.teamColours = team;
+        face = lcd::makeJtFace(i, lv_obj_get_parent(ui.root()), fonts, o);
     }
     void button(Phys b, bool down, uint32_t now) override {
+        if (face && down) face->pressed(now);
         ctl.button(b == Phys::Crown ? jt::Btn::Crown : b == Phys::Right ? jt::Btn::Timeout : jt::Btn::Undo, down, now);
     }
     void touch(int x, int y, uint32_t now) override { ctl.touch(x, y, now); }
@@ -52,7 +55,7 @@ struct BoxApp : App {
     boxcore::BoxTimer local;
     box::Controller ctl;
     box::Ui ui;
-    std::unique_ptr<lcd::BoxFace> face;
+    std::unique_ptr<lcd::Face> face;
     jt::Fonts fonts;
     BoxApp(lv_obj_t* scr, box::Role r, int team, crg::Client* c, bool conn, const jt::Fonts& f)
         : ctl(r, team, local, c, conn ? box::Mode::Connected : box::Mode::Standalone), ui(scr, f), fonts(f) {}
@@ -60,11 +63,14 @@ struct BoxApp : App {
         face.reset();
         lv_obj_delete(ui.root());
     }
-    void setFace(int i) override {
+    void setFace(int i, bool team) override {
         face.reset();
-        if (i > 0) face.reset(new lcd::BoxFace(lv_obj_get_parent(ui.root()), fonts, (lcd::Palette)i));
+        lcd::Options o;
+        o.teamColours = team;
+        face = lcd::makeBoxFace(i, lv_obj_get_parent(ui.root()), fonts, o);
     }
     void button(Phys b, bool down, uint32_t now) override {
+        if (face && down) face->pressed(now);
         ctl.button(b == Phys::Crown ? box::Btn::Crown : b == Phys::Left ? box::Btn::Left : box::Btn::Right, down, now);
     }
     void touch(int x, int y, uint32_t now) override { ctl.touch(x, y, now); }
@@ -328,7 +334,7 @@ http::Response Device::handle(const http::Request& r) {
         cfg::Settings next;
         std::string err = cfg::applyForm(settings_, r.body, next);
         if (!err.empty()) {
-            resp.body = cfg::page(settings_, err);
+            resp.body = cfg::page(settings_, err, "", physicalNames());
             return resp;
         }
         std::string note;
@@ -339,7 +345,7 @@ http::Response Device::handle(const http::Request& r) {
         return resp;
     }
     if (r.path == "/") {
-        resp.body = cfg::page(settings_, setupMessage_, p_.firmwareVersion());
+        resp.body = cfg::page(settings_, setupMessage_, p_.firmwareVersion(), physicalNames());
         setupMessage_.clear();
         return resp;
     }
@@ -356,8 +362,8 @@ void Device::applySettings(const cfg::Settings& s, std::string& note) {
     settings_ = s;
     p_.saveSettings(cfg::serialize(s));
     setBrightness(s.brightness);
-    if (old.face != s.face) {
-        app_->setFace(s.face);
+    if (old.faces[(int)role_] != s.faces[(int)role_] || old.teamColours != s.teamColours) {
+        app_->setFace(s.faces[(int)role_], s.teamColours);
         raiseOverlays();
     }
     bool netsChanged = old.networks.size() != s.networks.size();
@@ -374,7 +380,7 @@ void Device::applySettings(const cfg::Settings& s, std::string& note) {
                         old.periodAfterTimeout != s.periodAfterTimeout || old.undoLevels != s.undoLevels;
     bool restart = (menu::RoleId)s.role != role_ || host != host_ || port != port_ ||
                    (rulesChanged && role_ == menu::RoleId::JamTimer) ||
-                   old.swapButtons[(int)role_] != s.swapButtons[(int)role_]; // the names on screen
+                   old.buttons[(int)role_] != s.buttons[(int)role_]; // the names on screen
     if (!restart) return;
     if (!app_->idle(p_.now())) {
         note = " Some changes apply when no clock runs and the box is empty.";
@@ -385,11 +391,13 @@ void Device::applySettings(const cfg::Settings& s, std::string& note) {
     host_ = host;
     port_ = port;
     role_ = (menu::RoleId)s.role;
-    start(conn && !host_.empty());
+    restartApp(conn && !host_.empty());
+}
+
+void Device::restartApp(bool connected) {
+    start(connected);
     lv_obj_add_event_cb(app_->root(), onTouch, LV_EVENT_PRESSED, this);
-    lv_obj_move_foreground(menuUi_->root());
-    if (setupRoot_) lv_obj_move_foreground(setupRoot_);
-    if (updateRoot_) lv_obj_move_foreground(updateRoot_);
+    raiseOverlays();
 }
 
 void Device::onTouch(lv_event_t* e) {
@@ -422,8 +430,8 @@ void Device::button(Phys b, bool down) {
         }
         return;
     }
-    // Per-role setting: swap the 10 and 2 o'clock buttons.
-    if (settings_.swapButtons[(int)role_] && b != Phys::Crown) b = b == Phys::Left ? Phys::Right : Phys::Left;
+    // Per-role setting: which button does what.
+    b = logical(b);
     if (updateRoot_) {
         // Any button closes the update screen (and stops a check or a
         // download; the running firmware stays). Not once it is installed.
@@ -522,13 +530,37 @@ void Device::loop() {
     menuUi_->show(menu_.view());
 }
 
-// Button names on screen (lib/buttons), with this role's swap of the side
-// buttons.
+// The role's mapping (cfg::Settings::buttons): the physical button -> the
+// action slot the controllers know as Crown, Left and Right.
+Phys Device::logical(Phys b) const {
+    const std::string& m = settings_.buttons[(int)role_];
+    size_t i = m.find(b == Phys::Crown ? 'c' : b == Phys::Left ? 'l' : 'r');
+    return i == 0 ? Phys::Crown : i == 1 ? Phys::Left : i == 2 ? Phys::Right : b;
+}
+
+cfg::ButtonNames Device::physicalNames() const {
+    const upd::Board& bd = p_.board();
+    cfg::ButtonNames n;
+    if (bd.crownName) n.crown = bd.crownName;
+    if (bd.leftName) n.left = bd.leftName;
+    if (bd.rightName) n.right = bd.rightName;
+    return n;
+}
+
+// Button names on screen (lib/buttons) for this role's mapping: each action
+// is named after the button that does it. A board without coloured buttons
+// keeps its own texts ("Crown", "Undo") as long as nothing is moved.
 void Device::setButtonNames() {
     const upd::Board& bd = p_.board();
-    bool sw = settings_.swapButtons[(int)role_];
-    btn::gNames = {bd.crownName, sw ? bd.rightName : bd.leftName, sw ? bd.leftName : bd.rightName,
-                   bd.crownAt,   sw ? bd.rightAt : bd.leftAt,     sw ? bd.leftAt : bd.rightAt};
+    const std::string& m = settings_.buttons[(int)role_];
+    bool moved = m != "clr";
+    auto name = [&](char k) -> const char* {
+        const char* n = k == 'c' ? bd.crownName : k == 'l' ? bd.leftName : bd.rightName;
+        if (n || !moved) return n;
+        return k == 'c' ? "Crown" : k == 'l' ? "10 o'clock" : "2 o'clock";
+    };
+    auto at = [&](char k) { return k == 'c' ? bd.crownAt : k == 'l' ? bd.leftAt : bd.rightAt; };
+    btn::gNames = {name(m[0]), name(m[1]), name(m[2]), at(m[0]), at(m[1]), at(m[2])};
 }
 
 void Device::start(bool connected) {
@@ -552,7 +584,7 @@ void Device::start(bool connected) {
     default:
         app_ = new BoxApp(screen_, box::Role::Blockers, role_ == menu::RoleId::Blockers2 ? 2 : 1, cp, connected, fonts_);
     }
-    app_->setFace(settings_.face);
+    app_->setFace(settings_.faces[(int)role_], settings_.teamColours);
     raiseOverlays();
 }
 
@@ -647,12 +679,33 @@ menu::Refusal Device::clearClocks() {
     return "";
 }
 
-// Menu > Device > Face: the next face, at once (no restart).
+// Menu > Device > Face: this role's next face, at once (no restart).
 void Device::nextFace() {
-    settings_.face = (settings_.face + 1) % cfg::kFaces;
+    int& f = settings_.faces[(int)role_];
+    f = (f + 1) % cfg::kFaces;
     p_.saveSettings(cfg::serialize(settings_));
-    app_->setFace(settings_.face);
+    app_->setFace(f, settings_.teamColours);
     raiseOverlays();
+}
+
+// Menu > Device > Buttons: which button does this role's main action.
+std::string Device::buttonsName() const {
+    cfg::ButtonNames n = physicalNames();
+    char k = settings_.buttons[(int)role_][0];
+    return std::string(role_ == menu::RoleId::Jammers ? "undo: " : "main: ") + (k == 'c' ? n.crown : k == 'l' ? n.left : n.right);
+}
+
+// The next of the six mappings; the screen texts follow (an app restart).
+menu::Refusal Device::nextButtons() {
+    if (!app_->idle(p_.now())) return "Not while a clock runs or someone is in the box";
+    static const char* const perms[6] = {"clr", "crl", "lcr", "lrc", "rcl", "rlc"};
+    std::string& m = settings_.buttons[(int)role_];
+    int i = 0;
+    while (i < 6 && m != perms[i]) i++;
+    m = perms[(i + 1) % 6];
+    p_.saveSettings(cfg::serialize(settings_));
+    restartApp(app_->connected());
+    return "";
 }
 
 void Device::setBrightness(int pct) {

@@ -17,6 +17,7 @@ enum class Mode : uint8_t { Standalone, Connected };
 // Left = 10 o'clock, Right = 2 o'clock. Blockers: Right = release the first
 // skater whose time is up (connected) or pause/resume (standalone).
 enum class Btn : uint8_t { Crown, Left, Right };
+int32_t teamColour(const crg::TeamState& t); // "#rrggbb" -> 0xrrggbb, -1 = none
 enum class Screen : uint8_t { Main, Picker, Menu, NoConn, SwapPrompt, RejoinPrompt };
 enum class Phase : uint8_t { Serving, Stand, Done, Waiting, Paused }; // Waiting: between jams (connected)
 enum class Feedback : uint8_t { None, Waiting, NotTaken, NotAllowed };
@@ -48,6 +49,9 @@ struct View {
     std::string notice;   // short message over the screen for 2 s ("" = none)
     std::string emptyLeft, emptyRight; // jammers: text on an empty half
     std::string teamLeft, teamRight;   // jammers: team chips
+    // Team colours from CRG (0xrrggbb; -1 = none): the jammer halves, and the
+    // team a blockers role times. Standalone: none.
+    int32_t colourLeft = -1, colourRight = -1, colourTeam = -1;
     int holdPermille = 0;
     int holdStage = 0; // undo hold: 0 = towards undo (1 s), 1 = towards the menu (3 s)
     Feedback feedback = Feedback::None;

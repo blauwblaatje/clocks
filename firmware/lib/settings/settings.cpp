@@ -5,14 +5,39 @@
 
 namespace cfg {
 
-const char* const kFaceKeys[kFaces] = {"classic", "lcd-day", "lcd-night", "lcd-colour"};
-const char* const kFaceNames[kFaces] = {"Classic", "LCD day", "LCD night", "LCD night, colour"};
+const char* const kFaceKeys[kFaces] = {"classic", "lcd-day", "lcd-night", "lcd-colour", "big", "big-outline",
+                                       "rings", "chrono", "contrast", "flip", "nixie"};
+const char* const kFaceNames[kFaces] = {"Classic", "LCD day", "LCD night", "LCD night, colour", "Big",
+                                        "Big, outline", "Rings", "Chronograph", "High contrast", "Flip", "Nixie"};
 
 static const char* const kRoleKeys[kRoles] = {"jt", "blockers1", "blockers2", "jammers"};
 static const char* const kRoleNames[kRoles] = {"Jam timer", "Team 1 blockers", "Team 2 blockers", "Jammers"};
 static const char* const kPat[3] = {"nextjam", "timeoutend", "running"};
 
 const char* roleKey(Role r) { return kRoleKeys[(int)r]; }
+const char* roleName(Role r) { return kRoleNames[(int)r]; }
+
+bool validButtons(const std::string& m) {
+    return m.size() == 3 && m.find('c') != std::string::npos && m.find('l') != std::string::npos &&
+           m.find('r') != std::string::npos;
+}
+
+const char* actionName(Role r, int slot) {
+    static const char* const jt[3] = {"start/stop jam", "undo, hold: menu", "timeout"};
+    static const char* const bl[3] = {"sat down", "undo, hold: menu", "release/pause"};
+    static const char* const jm[3] = {"pause, hold: undo/menu", "left sat down", "right sat down"};
+    const char* const* a = r == Role::JamTimer ? jt : r == Role::Jammers ? jm : bl;
+    return slot >= 0 && slot < 3 ? a[slot] : "";
+}
+
+std::string buttonsText(Role r, const std::string& m, const ButtonNames& n) {
+    std::string o;
+    for (int i = 0; i < 3 && i < (int)m.size(); i++) {
+        if (i) o += " \xc2\xb7 ";
+        o += (m[i] == 'c' ? n.crown : m[i] == 'l' ? n.left : n.right) + ": " + actionName(r, i);
+    }
+    return o;
+}
 
 // ---------- text helpers ----------
 
@@ -115,10 +140,11 @@ std::string serialize(const Settings& s) {
     std::string o = "version=1\n";
     auto put = [&](const std::string& k, const std::string& v) { o += k + "=" + escapeLine(v) + "\n"; };
     put("role", roleKey(s.role));
-    for (int r = 0; r < kRoles; r++) put(std::string("swap.") + kRoleKeys[r], s.swapButtons[r] ? "1" : "0");
+    for (int r = 0; r < kRoles; r++) put(std::string("buttons.") + kRoleKeys[r], s.buttons[r]);
     put("motor", s.motorFitted ? "1" : "0");
     put("brightness", std::to_string(s.brightness));
-    put("face", kFaceKeys[s.face]);
+    for (int r = 0; r < kRoles; r++) put(std::string("face.") + kRoleKeys[r], kFaceKeys[s.faces[r]]);
+    put("teamColours", s.teamColours ? "1" : "0");
     put("sleepMinutes", std::to_string(s.sleepMinutes));
     put("updateUrl", s.updateUrl);
     put("jam", msToText(s.jamMs));
@@ -152,15 +178,20 @@ static void applyValue(Settings& s, const std::string& k, const std::string& v) 
     if (k == "role") {
         for (int r = 0; r < kRoles; r++)
             if (v == kRoleKeys[r]) s.role = (Role)r;
-    } else if (k.compare(0, 5, "swap.") == 0) {
+    } else if (k.compare(0, 5, "swap.") == 0) { // up to 0.2: swap the 10 and 2 o'clock buttons
         for (int r = 0; r < kRoles; r++)
-            if (k.substr(5) == kRoleKeys[r]) s.swapButtons[r] = v == "1";
+            if (k.substr(5) == kRoleKeys[r] && v == "1") s.buttons[r] = "crl";
+    } else if (k.compare(0, 8, "buttons.") == 0) {
+        for (int r = 0; r < kRoles; r++)
+            if (k.substr(8) == kRoleKeys[r] && validButtons(v)) s.buttons[r] = v;
     } else if (k == "motor") s.motorFitted = v == "1";
     else if (k == "brightness") num(10, 100, s.brightness);
-    else if (k == "face") {
+    else if (k == "face" || k.compare(0, 5, "face.") == 0) { // "face": 0.2's one face for every role
         for (int i = 0; i < kFaces; i++)
-            if (v == kFaceKeys[i]) s.face = i;
-    }
+            if (v == kFaceKeys[i])
+                for (int r = 0; r < kRoles; r++)
+                    if (k == "face" || k.substr(5) == kRoleKeys[r]) s.faces[r] = i;
+    } else if (k == "teamColours") s.teamColours = v == "1";
     else if (k == "sleepMinutes") num(0, 120, s.sleepMinutes);
     // 0.1.0's default named the Waveshare's release file; now the site, so
     // each board finds its own firmware
@@ -250,12 +281,16 @@ std::string applyForm(const Settings& old, const std::string& body, Settings& ou
             roleOk = true;
         }
     if (!roleOk) err += "Choose a role. ";
-    for (int r = 0; r < kRoles; r++) s.swapButtons[r] = f.count(std::string("swap.") + kRoleKeys[r]) > 0;
+    for (int r = 0; r < kRoles; r++) {
+        std::string b = get(std::string("buttons.") + kRoleKeys[r]);
+        if (validButtons(b)) s.buttons[r] = b;
+        std::string fk = get(std::string("face.") + kRoleKeys[r]);
+        for (int i = 0; i < kFaces; i++)
+            if (fk == kFaceKeys[i]) s.faces[r] = i;
+    }
+    s.teamColours = f.count("teamColours") > 0;
     s.motorFitted = f.count("motor") > 0;
     num("brightness", "Brightness", 10, 100, s.brightness);
-    if (f.count("face"))
-        for (int i = 0; i < kFaces; i++)
-            if (get("face") == kFaceKeys[i]) s.face = i;
     if (f.count("sleepMinutes")) num("sleepMinutes", "Sleep after", 0, 120, s.sleepMinutes);
     if (f.count("updateUrl")) {
         s.updateUrl = get("updateUrl");
@@ -304,7 +339,7 @@ std::string applyForm(const Settings& old, const std::string& body, Settings& ou
     return "";
 }
 
-std::string page(const Settings& s, const std::string& message, const std::string& firmware) {
+std::string page(const Settings& s, const std::string& message, const std::string& firmware, const ButtonNames& names) {
     std::string h;
     h.reserve(8000);
     h += "<!doctype html><html><head><meta charset=\"utf-8\">"
@@ -328,10 +363,23 @@ std::string page(const Settings& s, const std::string& message, const std::strin
     for (int r = 0; r < kRoles; r++)
         h += std::string("<option value=\"") + kRoleKeys[r] + "\"" + ((int)s.role == r ? " selected" : "") + ">" +
              kRoleNames[r] + "</option>";
-    h += "</select></label><small>Swap the 10 and 2 o'clock buttons for:</small>";
-    for (int r = 0; r < kRoles; r++)
-        h += std::string("<label><input type=\"checkbox\" name=\"swap.") + kRoleKeys[r] + "\"" +
-             (s.swapButtons[r] ? " checked" : "") + "> " + kRoleNames[r] + "</label>";
+    h += "</select></label>";
+    // Per role: its face and its buttons, so a role change brings both along.
+    static const char* const perms[6] = {"clr", "crl", "lcr", "lrc", "rcl", "rlc"};
+    for (int r = 0; r < kRoles; r++) {
+        h += std::string("<fieldset><legend>") + kRoleNames[r] + "</legend><label>Clock face<select name=\"face." +
+             kRoleKeys[r] + "\">";
+        for (int i = 0; i < kFaces; i++)
+            h += std::string("<option value=\"") + kFaceKeys[i] + "\"" + (s.faces[r] == i ? " selected" : "") + ">" +
+                 kFaceNames[i] + "</option>";
+        h += std::string("</select></label><label>Buttons<select name=\"buttons.") + kRoleKeys[r] + "\">";
+        for (const char* m : perms)
+            h += std::string("<option value=\"") + m + "\"" + (s.buttons[r] == m ? " selected" : "") + ">" +
+                 htmlEscape(buttonsText((Role)r, m, names)) + "</option>";
+        h += "</select></label></fieldset>";
+    }
+    h += std::string("<label><input type=\"checkbox\" name=\"teamColours\"") + (s.teamColours ? " checked" : "") +
+         "> Team colours from the scoreboard on the box timer faces</label>";
 
     h += "<h2>Wi-Fi and scoreboard</h2><small>Tried in this order. Leave the password empty to keep the saved "
          "one.</small>";
@@ -375,11 +423,6 @@ std::string page(const Settings& s, const std::string& message, const std::strin
     h += "</select></label>";
 
     h += "<h2>Device</h2>";
-    h += "<label>Clock face<select name=\"face\">";
-    for (int i = 0; i < kFaces; i++)
-        h += std::string("<option value=\"") + kFaceKeys[i] + "\"" + (s.face == i ? " selected" : "") + ">" +
-             kFaceNames[i] + "</option>";
-    h += "</select></label>";
     h += "<label>Brightness (%)<input type=\"number\" name=\"brightness\" min=\"10\" max=\"100\" value=\"" +
          std::to_string(s.brightness) + "\"></label>";
     h += "<label>Sleep after (minutes without a clock running or a press; 0 = never)"
